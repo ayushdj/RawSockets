@@ -1,4 +1,10 @@
+#!/usr/bin/env python3
+
 import argparse
+
+
+def main(url):
+    print(f'Input url is: {url}')
 
 
 if __name__ == '__main__':
