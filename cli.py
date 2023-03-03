@@ -15,6 +15,10 @@ def parse_host(url: str) -> str:
     hostname = re.match(hostname_re, url).group(1)
     return hostname
 
+def main(url):
+    print(f'Input url is: {url}')
+
+
 if __name__ == '__main__':
     # Define the command line arguments
     parser = argparse.ArgumentParser(description='Perform a raw HTTP GET')
