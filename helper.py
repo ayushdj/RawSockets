@@ -3,6 +3,9 @@ import struct
 import time
 import urllib.parse
 
+from utils import (calculate_checksum, make_ip_header, make_tcp_header,
+                   write_file)
+
 # Define constants
 TCP_PROTOCOL = socket.IPPROTO_TCP
 RAW_PROTOCOL = socket.IPPROTO_RAW
@@ -39,67 +42,13 @@ class MyRawSocket:
         actual_host = splitted_url.netloc
         print(actual_host)
 
-    # Define function to create TCP segment
-    def make_tcp_header(self, source_port, destination_port, seq_num, ack_num, syn_flag, ack_flag, window_size):
-        """
-            This function generates the TCP header
-        """
-        tcp_header = struct.pack('!HHLLBBHHH', source_port, destination_port, seq_num, ack_num, IP_HEADER_LENGTH << 4,
-                                 (syn_flag << 1) | ack_flag, TCP_WINDOW_SIZE, 0, window_size)
-        pseudo_header = struct.pack('!4s4sBBH', socket.inet_aton('127.0.0.1'), socket.inet_aton('127.0.0.1'), 0,
-                                    TCP_PROTOCOL, len(tcp_header))
-        checksum = self.calculate_checksum(pseudo_header + tcp_header)
-        tcp_header = struct.pack('!HHLLBBH', source_port, destination_port, seq_num, ack_num, IP_HEADER_LENGTH << 4,
-                                 (syn_flag << 1) | ack_flag, TCP_WINDOW_SIZE) + struct.pack('H',
-                                                                                            checksum) + struct.pack(
-            '!H', window_size)
-        return tcp_header
-
-    def make_ip_header(self, src_ip, dest_ip, protocol, data):
-        # IPv4 header fields
-        version = IP_VERSION
-        ip_header_length = IP_HEADER_LENGTH
-        tos = 0
-        total_len = len(data) + IP_LENGTH_OFFSET
-        identifier = 54321
-        flags = 0
-        fragmentation_offset = 0
-        ip_ttl = IP_TTL
-        checksum = 0
-        src_ip_packed = socket.inet_aton(src_ip)
-        dest_ip_packed = socket.inet_aton(dest_ip)
-
-        header = struct.pack('!BBHHHBBH4s4s', (version << 4) + ip_header_length, tos, total_len,
-                             identifier, (flags << 13) + fragmentation_offset, ip_ttl, protocol, checksum,
-                             src_ip_packed, dest_ip_packed)
-
-        # calculate the checksum using the packed header
-        checksum = self.calculate_checksum(header)
-
-        # replace the placeholder value with the actual checksum
-        header = header[:10] + struct.pack('!H', checksum) + header[12:]
-
-        return header
-
-    def calculate_checksum(self, data):
-        """
-            Function defines the TCP checksum -> move to util file
-        """
-        if len(data) % 2 == 1:
-            data += b'\x00'
-        checksum = 0
-        for i in range(0, len(data), 2):
-            checksum += (data[i] << 8) + data[i + 1]
-        while checksum >> 16:
-            checksum = (checksum & 0xFFFF) + (checksum >> 16)
-        return ~checksum & 0xFFFF
 
     # Define function to send TCP segment
     def send_tcp_segment(self, segment, dest_ip, dest_port):
         self.sending_socket.sendto(segment, (dest_ip, dest_port))
 
 
-# Define function to receive TCP segment
+    # Define function to receive TCP segment
     def receive_tcp_segment(self):
         segment, _ = self.receiving_socket.recvfrom(BUFFER_LENGTH)
         ip_header_length = (segment[0] & 0xF) * 4
