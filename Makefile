@@ -1,5 +1,5 @@
 rawhttpget:
-	cp cli.py rawhttpget && chmod +x rawhttpget
+	cp rawhttpget.py rawhttpget && chmod +x rawhttpget
 
 clean:
 	rm rawhttpget
