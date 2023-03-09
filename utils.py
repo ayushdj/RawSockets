@@ -85,7 +85,10 @@ def make_tcp_header(
                                                                                                     '!H', window_size)
         return tcp_header
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> bc520f50a01b633185658cbdd8622c4b8940a96f
 def make_ip_header(src_ip, dest_ip, protocol, data):
     '''
     Generate IP header.

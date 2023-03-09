@@ -3,8 +3,12 @@ import struct
 import time
 import urllib.parse
 
+<<<<<<< HEAD
 from utils import (calculate_checksum, make_ip_header, make_tcp_header,
                    write_file)
+=======
+from utils import calculate_checksum, make_tcp_header, write_file
+>>>>>>> bc520f50a01b633185658cbdd8622c4b8940a96f
 
 # Define constants
 TCP_PROTOCOL = socket.IPPROTO_TCP
