@@ -1,22 +1,11 @@
 #!/usr/bin/env python3
-
+from helper import *
 import argparse
-import re
 
 
 def main(url):
     print(f'Input url is: {url}')
-    print(f'Hostname is: {parse_host(url)}')
-
-
-# Extract the hostname from the URL
-def parse_host(url: str) -> str:
-    hostname_re = r'https?://([^/]+)'
-    hostname = re.match(hostname_re, url).group(1)
-    return hostname
-
-def main(url):
-    print(f'Input url is: {url}')
+    raw_socket = MyRawSocket()
 
 
 if __name__ == '__main__':
