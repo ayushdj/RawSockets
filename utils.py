@@ -9,6 +9,7 @@ IP_HEADER_LENGTH = 5
 IP_LENGTH_OFFSET = 20
 IP_VERSION = 4
 TCP_PROTOCOL = socket.IPPROTO_TCP
+MAX_WINDOW_SIZE = 1000
 
 
 def calculate_checksum(message):
@@ -55,105 +56,103 @@ def write_file(file, response_dict: dict):
             write_file.writelines(response_dict[element])
 
 
-# TODO: fix this function so that it works to add checksum and/or create blank header.
 def make_tcp_header(
     source_port,
-    destination_port,
-    seq_num,
-    ack_num,
+    sequence_number,
+    ack_number,
+    finish_flag,
     syn_flag,
+    reset_flag,
+    push_flag,
     ack_flag,
-    window_size,
+    tcp_header=None,
     source_ip=None,
     dest_ip=None,
-    input_tcp_header=None,
     data=None,
-):
+) -> bytes:
     """
-    Generate TCP header.
+    Generate a TCP Header and optionally include a checksum if an existing header is passed in.
+    Reference: https://www.site24x7.com/learn/linux/tcp-flags.html
 
     Args:
-        source_port(int): source port
-        destination_port(int): destination port
-        seq_num(int): number within packet sequence
-        ack_num(int): acknowledgement number
-        syn_flag(int): flag denoting synchronization
-        ack_flag(int): flag denoting acknowledgement
-        window_size(int): size of congestion window
-        source_ip: source IP address (optional)
-        dest_ip: destination IP address (optional)
-        input_tcp_header: tcp header that's been packed already (optional)
-        data: data to add len of within header (optional)
-    Returns:
-        TCP header packed
+        source_port (int): TCP port from source
+        sequence_number (int): number in sequence network order
+        ack_number (int): number in sequence for acknowledgement
+        finish_flag (int): terminates TCP connection
+        syn_flag (int): create TCP connection (handshake)
+        reset_flag (int): terminate the connection andn drop data in transit
+        push_flag (int): bypass network buffering
+        ack_flag (int): acknowledge data reception or synchronization packets
+        tcp_header (bytes): packed TCP header to add checksum to (optional)
+        source_ip (int): IP of source (optional)
+        dest_ip (int): IP of destination (optional)
+        data: data to get length of to include in header (optional)
     """
+    # Create the base tcp header
+    tcp_dest_port = 80
+    tcp_doff = 5 << 4
+    tcp_urg_ptr = 0
+    tcp_flags = (
+        finish_flag
+        + (syn_flag << 1)
+        + (reset_flag << 2)
+        + (push_flag << 3)
+        + (ack_flag << 4)
+        + (tcp_urg_ptr << 5)
+    )
+
     tcp_header = struct.pack(
         "!HHLLBBHHH",
         source_port,
-        destination_port,
-        seq_num,
-        ack_num,
-        IP_HEADER_LENGTH << 4,
-        (syn_flag << 1) | ack_flag,
-        window_size,
+        tcp_dest_port,
+        sequence_number,
+        ack_number,
+        tcp_doff,
+        tcp_flags,
+        socket.htons(MAX_WINDOW_SIZE),  # window size
+        0,  # checksum is 0 to begin
+        tcp_urg_ptr,
     )
-    pseudo_header = struct.pack(
-        "!4s4sBBH",
-        socket.inet_aton("127.0.0.1"),
-        socket.inet_aton("127.0.0.1"),
-        0,
-        TCP_PROTOCOL,
-        len(tcp_header),
-    )
-    checksum = calculate_checksum(pseudo_header + tcp_header)
-    tcp_header = (
-        struct.pack(
-            "!HHLLBBH",
-            source_port,
-            destination_port,
-            seq_num,
-            ack_num,
-            IP_HEADER_LENGTH << 4,
-            (syn_flag << 1) | ack_flag,
+
+    # Optionally include a checksum to the tcp header if optional fields passed in.
+    if tcp_header and source_ip and dest_ip and data:
+        source_address = socket.inet_aton(source_ip)
+        destination_address = socket.inet_aton(dest_ip)
+        header_size = len(tcp_header) + len(data)
+
+        # Construct the packet with corresponding fields
+        packet = (
+            struct.pack(
+                "!4s4sBBH",
+                source_address,
+                destination_address,
+                0,
+                TCP_PROTOCOL,
+                header_size,
+            )
+            + tcp_header
+            + data
         )
-        + struct.pack("H", checksum)
-        + struct.pack("!H", window_size)
-    )
 
-    # Create a tcp_header with a checksum based on input values
-    if input_tcp_header and data and source_ip and dest_ip:
-        source_addr = socket.inet_aton(source_ip)
-        dest_addr = socket.inet_aton(dest_ip)
-        len_of_header = len(tcp_header) + len(data)
-
-        packet = struct.pack(
-            "!4s4sBBH", source_addr, dest_addr, 0, TCP_PROTOCOL, len_of_header
-        )
-        packet += packet + tcp_header + data
-
-        checksum = calculate_checksum(packet)
-
-        tcp_header = struct.pack
         tcp_header = (
             struct.pack(
-                "!HHLLBBH",
+                "!HHLLBBHHH",
                 source_port,
-                destination_port,
-                seq_num,
-                ack_num,
-                IP_HEADER_LENGTH << 4,
-                (syn_flag << 1) | ack_flag,
-                TCP_WINDOW_SIZE,
+                tcp_dest_port,
+                sequence_number,
+                ack_number,
+                tcp_doff,
+                tcp_flags,
+                socket.htons(MAX_WINDOW_SIZE),  # window size
             )
-            + struct.pack("H", checksum)
-            + struct.pack("!H", window_size)
+            + struct.pack("H", calculate_checksum(packet))
+            + struct.pack("!H", tcp_urg_ptr)
         )
-        return tcp_header
 
     return tcp_header
 
 
-def make_ip_header(src_ip, dest_ip, protocol, data=""):
+def make_ip_header(src_ip, dest_ip, protocol, data="") -> bytes:
     """
     Generate IP header.
 
@@ -194,8 +193,5 @@ def make_ip_header(src_ip, dest_ip, protocol, data=""):
 
     # calculate the checksum using the packed header
     checksum = calculate_checksum(header)
-
     # replace the placeholder value with the actual checksum
-    header = header[:10] + struct.pack("!H", checksum) + header[12:]
-
-    return header
+    return header[:10] + struct.pack("!H", checksum) + header[12:]
