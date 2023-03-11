@@ -1,13 +1,8 @@
 import socket
-import struct
 import time
 import urllib.parse
 
-from utils import calculate_checksum, make_ip_header, make_tcp_header, write_file
-
-# Define constants
-TCP_PROTOCOL = socket.IPPROTO_TCP
-RAW_PROTOCOL = socket.IPPROTO_RAW
+from utils import make_ip_header, make_tcp_header
 
 # IP constants
 IP_VERSION = 4
@@ -31,10 +26,10 @@ class MyRawSocket:
     def __init__(self):
         # Create 2 sockets - one for sending the raw data, one for receiving TCP data
         self.sending_socket = socket.socket(
-            socket.AF_INET, socket.SOCK_RAW, RAW_PROTOCOL
+            socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_RAW
         )
         self.receiving_socket = socket.socket(
-            socket.AF_INET, socket.SOCK_RAW, TCP_PROTOCOL
+            socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_TCP
         )
         self.syn_start_time = None
 
@@ -104,7 +99,7 @@ class MyRawSocket:
             tcp_header,
             source_ip,
             dest_ip,
-            '',
+            "",
         )
         packet = ip_header + tcp_header
         self.sending_socket.sendto(packet, (dest_ip, 0))
@@ -124,11 +119,11 @@ class MyRawSocket:
             source_port: source port
         """
         ip_header = make_ip_header(54321, source_ip, dest_ip)
-        tcp_header = make_tcp_header(src_port, 0, 0, 0, 1, 0, 0, 0)
-
-        # Get Tcp header with create_tcp_header_with_checksum
-        tcp_header = create_tcp_header_with_checksum(
-            tcp_header, src_port, 0, 0, 0, 1, 0, 0, 0, source_ip, dest_ip, ""
+        # Make initial TCP header
+        tcp_header = make_tcp_header(source_port, 0, 0, 0, 1, 0, 0, 0)
+        # Recreate TCP header with checksum included.
+        tcp_header = make_tcp_header(
+            tcp_header, source_port, 0, 0, 0, 1, 0, 0, 0, source_ip, dest_ip, ""
         )
 
         # final full packet - syn packets dont have any data

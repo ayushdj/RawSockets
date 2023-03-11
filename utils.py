@@ -2,6 +2,7 @@
 
 import socket
 import struct
+import sys
 
 CLRF = "\r\n\r\n"
 IP_HEADER_LENGTH = 5
@@ -40,20 +41,21 @@ def write_file(file, response_dict: dict):
         file: file pointer
         response_dict(dict): dictionary mapping int to strings as parts of response.
     """
-    response = "".join([response_dict.get(key) for key in sorted(response_dict)])
+    response = "".join([response_dict[key] for key in sorted(response_dict)])
     # Make sure valid HTTP Response Code
     if response.find("200 OK") < 0:
         print("[ERROR]: Invalid HTTP Response Code")
-    sys.exit()
+        sys.exit()
     # Write the response to the file if valid response code.
     with open(file, "w") as write_file:
-        ordered_seq = sorted(response_dict.iterkeys())
+        ordered_seq = sorted(response_dict.keys())
         for idx, element in enumerate(ordered_seq):
             if idx == 0:
                 write_file.writelines(response_dict[element].split(CLRF)[1])
             write_file.writelines(response_dict[element])
 
 
+# TODO: fix this function so that it works to add checksum and/or create blank header.
 def make_tcp_header(
     source_port,
     destination_port,
@@ -93,8 +95,6 @@ def make_tcp_header(
         ack_num,
         IP_HEADER_LENGTH << 4,
         (syn_flag << 1) | ack_flag,
-        TCP_WINDOW_SIZE,
-        0,
         window_size,
     )
     pseudo_header = struct.pack(
@@ -115,7 +115,6 @@ def make_tcp_header(
             ack_num,
             IP_HEADER_LENGTH << 4,
             (syn_flag << 1) | ack_flag,
-            TCP_WINDOW_SIZE,
         )
         + struct.pack("H", checksum)
         + struct.pack("!H", window_size)
@@ -154,7 +153,7 @@ def make_tcp_header(
     return tcp_header
 
 
-def make_ip_header(src_ip, dest_ip, protocol, data):
+def make_ip_header(src_ip, dest_ip, protocol, data=""):
     """
     Generate IP header.
 
@@ -174,7 +173,7 @@ def make_ip_header(src_ip, dest_ip, protocol, data):
     identifier = 54321
     flags = 0
     fragmentation_offset = 0
-    ip_ttl = IP_TTL
+    ip_ttl = 255
     checksum = 0
     src_ip_packed = socket.inet_aton(src_ip)
     dest_ip_packed = socket.inet_aton(dest_ip)
