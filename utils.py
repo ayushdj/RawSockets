@@ -58,18 +58,18 @@ def write_file(file, response_dict: dict):
 
 
 def make_tcp_header(
-        source_port,
-        sequence_number,
-        ack_number,
-        finish_flag,
-        syn_flag,
-        reset_flag,
-        push_flag,
-        ack_flag,
-        tcp_header=None,
-        source_ip=None,
-        dest_ip=None,
-        data=None,
+    source_port,
+    sequence_number,
+    ack_number,
+    finish_flag,
+    syn_flag,
+    reset_flag,
+    push_flag,
+    ack_flag,
+    tcp_header=None,
+    source_ip=None,
+    dest_ip=None,
+    data=None,
 ) -> bytes:
     """
     Generate a TCP Header and optionally include a checksum if an existing header is passed in.
@@ -94,12 +94,12 @@ def make_tcp_header(
     tcp_doff = 5 << 4
     tcp_urg_ptr = 0
     tcp_flags = (
-            finish_flag
-            + (syn_flag << 1)
-            + (reset_flag << 2)
-            + (push_flag << 3)
-            + (ack_flag << 4)
-            + (tcp_urg_ptr << 5)
+        finish_flag
+        + (syn_flag << 1)
+        + (reset_flag << 2)
+        + (push_flag << 3)
+        + (ack_flag << 4)
+        + (tcp_urg_ptr << 5)
     )
 
     tcp_header = struct.pack(
@@ -123,37 +123,66 @@ def make_tcp_header(
 
         # Construct the packet with corresponding fields
         packet = (
-                struct.pack(
-                    "!4s4sBBH",
-                    source_address,
-                    destination_address,
-                    0,
-                    TCP_PROTOCOL,
-                    header_size,
-                )
-                + tcp_header
-                + data
+            struct.pack(
+                "!4s4sBBH",
+                source_address,
+                destination_address,
+                0,
+                TCP_PROTOCOL,
+                header_size,
+            )
+            + tcp_header
+            + data
         )
 
         tcp_header = (
-                struct.pack(
-                    "!HHLLBBHHH",
-                    source_port,
-                    tcp_dest_port,
-                    sequence_number,
-                    ack_number,
-                    tcp_doff,
-                    tcp_flags,
-                    socket.htons(MAX_WINDOW_SIZE),  # window size
-                )
-                + struct.pack("H", calculate_checksum(packet))
-                + struct.pack("!H", tcp_urg_ptr)
+            struct.pack(
+                "!HHLLBBHHH",
+                source_port,
+                tcp_dest_port,
+                sequence_number,
+                ack_number,
+                tcp_doff,
+                tcp_flags,
+                socket.htons(MAX_WINDOW_SIZE),  # window size
+            )
+            + struct.pack("H", calculate_checksum(packet))
+            + struct.pack("!H", tcp_urg_ptr)
         )
 
     return tcp_header
 
 
-def make_ip_header(src_ip, dest_ip, protocol, data="") -> bytes:
+def create_ip_header(packet_id, src_ip, dst_ip):
+    IP_HEADER_LEN = 5
+    IP_VERSION = 4
+    IP_TYPE_OF_SERVICE = 0
+    IP_TOTAL_LENGTH = 0
+    IP_ID = packet_id
+    IP_FRAGMENTAION_OFFSET = 0
+    IP_TTL = 255
+    IP_PROTOCOL = socket.IPPROTO_TCP
+    IP_CHECKSUM = 0
+    IP_SRC_ADDR = socket.inet_aton(src_ip)
+    IP_DST_ADDR = socket.inet_aton(dst_ip)
+    IP_IHL_VER = (IP_VERSION << 4) + IP_HEADER_LEN
+    ip_header = struct.pack(
+        "!BBHHHBBH4s4s",
+        IP_IHL_VER,
+        IP_TYPE_OF_SERVICE,
+        IP_TOTAL_LENGTH,
+        IP_ID,
+        IP_FRAGMENTAION_OFFSET,
+        IP_TTL,
+        IP_PROTOCOL,
+        IP_CHECKSUM,
+        IP_SRC_ADDR,
+        IP_DST_ADDR,
+    )
+    return ip_header
+
+
+def make_ip_header(src_ip, dest_ip, data="") -> bytes:
     """
     Generate IP header.
 
@@ -166,39 +195,34 @@ def make_ip_header(src_ip, dest_ip, protocol, data="") -> bytes:
         IP header packed
     """
     # IPv4 header fields
-    version = IP_VERSION
-    ip_header_length = IP_HEADER_LENGTH
     tos = 0
     total_len = len(data) + IP_LENGTH_OFFSET
     identifier = 54321
-    flags = 0
     fragmentation_offset = 0
     ip_ttl = 255
     checksum = 0
-    src_ip_packed = socket.inet_aton(src_ip)
-    dest_ip_packed = socket.inet_aton(dest_ip)
+    src_ip_num = socket.inet_aton(str(src_ip))
+    dest_ip_num = socket.inet_aton(dest_ip)
 
     header = struct.pack(
         "!BBHHHBBH4s4s",
-        (version << 4) + ip_header_length,
+        (IP_VERSION << 4) + IP_HEADER_LENGTH + 0,
         tos,
         total_len,
         identifier,
-        (flags << 13) + fragmentation_offset,
+        fragmentation_offset,
         ip_ttl,
-        protocol,
+        TCP_PROTOCOL,
         checksum,
-        src_ip_packed,
-        dest_ip_packed,
+        src_ip_num,
+        dest_ip_num,
     )
 
-    # calculate the checksum using the packed header
-    checksum = calculate_checksum(header)
-    # replace the placeholder value with the actual checksum
-    return header[:10] + struct.pack("!H", checksum) + header[12:]
+    return header
+
 
 def determine_destination_ip_address(url):
     returned_tuple = urllib.parse.urlparse(url)
     host_name = returned_tuple.hostname
-    destnation_ip_address = socket.gethostbyname(host_name.decode())
+    destnation_ip_address = socket.gethostbyname(host_name)
     return destnation_ip_address
