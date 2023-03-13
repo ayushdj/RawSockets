@@ -33,13 +33,13 @@ class MyRawSocket:
             socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_TCP
         )
 
-    def determine_url(self, url):
+    def determine_url_host(self, url):
         """
         Helper function to determine the URL of the
         """
         splitted_url = urllib.parse.urlsplit(url)
         actual_host = splitted_url.netloc
-        print(actual_host)
+        return actual_host
 
     # Define function to send TCP segment
     def send_tcp_segment(self, segment, dest_ip, dest_port):
@@ -148,3 +148,14 @@ class MyRawSocket:
         self.sending_socket.sendto(ip_header + tcp_header, (dest_ip, 0))
         # Record the time at which SYN is starting
         self.syn_start_time = time.time()
+
+    def determin_local_host_ip_address(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        sock.connect(('www.ccs.neu.edu', 9))
+        ip = sock.getsockname()[0]
+        return str(ip)
+
+    def request_for_resource(self, source_ip_address, destination_ip_address, source_port, tcp_header, hostname,
+                             path_url):
+        pass
