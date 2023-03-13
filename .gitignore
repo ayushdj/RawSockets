@@ -1,5 +1,5 @@
 rawhttpget
 pyrightconfig.json
 __pycache__/
-.idea
+.idea/*
 inspectionProfiles
