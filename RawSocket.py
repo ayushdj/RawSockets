@@ -91,16 +91,20 @@ class MyRawSocket:
             ip_header = struct.unpack("!BBHHHBBH4s4s", packet[:20])
             version = (ip_header[0] >> 4) & 0xF
             ip_header_len = version * 4
-            ttl = ip_header[5]
             source_ip_addr = socket.inet_ntoa(ip_header[8])
             dest_ip_addr = socket.inet_ntoa(ip_header[9])
             tcp_header = packet[ip_header_len : ip_header_len + 20]
             tcp_header = struct.unpack("!HHLLBBHHH", tcp_header)
 
+            print(f"Source IP: {source_ip_addr} == {dest_ip}")
+            print(f"Dest IP: {dest_ip_addr} == {source_ip}")
+            print(f"Header 5: {tcp_header[5]} == 18")
+            print(f"Source Port: {src_port} == {tcp_header[1]}")
+
             if (
                 source_ip_addr == dest_ip
                 and dest_ip_addr == source_ip
-                and ttl == 18
+                and tcp_header[5] == 18
                 and src_port == tcp_header[1]
                 and self.syn_start_time - time.time() < 60
             ):
