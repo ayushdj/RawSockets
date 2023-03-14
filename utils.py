@@ -153,35 +153,6 @@ def make_tcp_header(
     return tcp_header
 
 
-def create_ip_header(packet_id, src_ip, dst_ip):
-    IP_HEADER_LEN = 5
-    IP_VERSION = 4
-    IP_TYPE_OF_SERVICE = 0
-    IP_TOTAL_LENGTH = 0
-    IP_ID = packet_id
-    IP_FRAGMENTAION_OFFSET = 0
-    IP_TTL = 255
-    IP_PROTOCOL = socket.IPPROTO_TCP
-    IP_CHECKSUM = 0
-    IP_SRC_ADDR = socket.inet_aton(src_ip)
-    IP_DST_ADDR = socket.inet_aton(dst_ip)
-    IP_IHL_VER = (IP_VERSION << 4) + IP_HEADER_LEN
-    ip_header = struct.pack(
-        "!BBHHHBBH4s4s",
-        IP_IHL_VER,
-        IP_TYPE_OF_SERVICE,
-        IP_TOTAL_LENGTH,
-        IP_ID,
-        IP_FRAGMENTAION_OFFSET,
-        IP_TTL,
-        IP_PROTOCOL,
-        IP_CHECKSUM,
-        IP_SRC_ADDR,
-        IP_DST_ADDR,
-    )
-    return ip_header
-
-
 def make_ip_header(id, src_ip, dest_ip, data="") -> bytes:
     """
     Generate IP header.
