@@ -20,11 +20,9 @@ def main(url):
     # command to check TCP output: sudo tcpdump -i any port 3000 -n -v
     raw_socket.send_syn(source_ip_address, destination_ip_address, source_port)
 
-    # tcp_header = raw_socket.receive_synack(
-    #     source_ip_address, destination_ip_address, source_port
-    # )
-
-    tcp_header = raw_socket.get_synack_send_ack(source_ip_address, destination_ip_address, source_port)
+    tcp_header = raw_socket.receive_synack(
+        source_ip_address, destination_ip_address, source_port
+    )
 
     raw_socket.send_ack(
         source_ip_address, destination_ip_address, source_port, tcp_header
