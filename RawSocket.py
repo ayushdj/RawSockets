@@ -62,7 +62,7 @@ class MyRawSocket:
             source_port (int): source port
             tcp_header (bytes): tcp headers
         """
-        ip_header = make_ip_header(54322, source_ip, dest_ip)
+        ip_header = make_ip_header(2121, source_ip, dest_ip)
         tcp_sequence_num = tcp_header[3]
         tcp_ack_sequence_num = tcp_header[2] + 1  # must increment ack seq number
 
@@ -81,7 +81,7 @@ class MyRawSocket:
             tcp_header,
             source_ip,
             dest_ip,
-            "",
+            b"",
         )
         self.sending_socket.sendto(ip_header + tcp_header, (dest_ip, 0))
 
@@ -125,7 +125,8 @@ class MyRawSocket:
             dest_ip: destination IP address
             source_port: source port
         """
-        ip_header = make_ip_header(54321, source_ip, dest_ip)
+        ip_header = make_ip_header(2020, source_ip, dest_ip)
+
         # Make initial TCP header
         tcp_header = make_tcp_header(source_port, 0, 0, 0, 1, 0, 0, 0)
         # Recreate TCP header with checksum included
@@ -141,7 +142,7 @@ class MyRawSocket:
             tcp_header=tcp_header,
             source_ip=source_ip,
             dest_ip=dest_ip,
-            data="",
+            data=b"",
         )
 
         # Send the packet
@@ -149,13 +150,19 @@ class MyRawSocket:
         # Record the time at which SYN is starting
         self.syn_start_time = time.time()
 
-    def determin_local_host_ip_address(self):
+    def determine_local_host_ip_address(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-        sock.connect(('www.ccs.neu.edu', 9))
+        sock.connect(("www.ccs.neu.edu", 9))
         ip = sock.getsockname()[0]
         return str(ip)
 
-    def request_for_resource(self, source_ip_address, destination_ip_address, source_port, tcp_header, hostname,
-                             path_url):
+    def request_for_resource(
+        self,
+        source_ip_address,
+        destination_ip_address,
+        source_port,
+        tcp_header,
+        hostname,
+        path_url,
+    ):
         pass

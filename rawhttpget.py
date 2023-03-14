@@ -2,14 +2,14 @@
 import argparse
 
 from RawSocket import MyRawSocket
-from utils import *
+from utils import determine_destination_ip_address, write_file
 
 
 def main(url):
     print(f"Input url is: {url}")
 
     # to do
-    path_to_file = ''
+    path_to_file = ""
 
     file_pointer = None
 
@@ -17,20 +17,28 @@ def main(url):
     raw_socket = MyRawSocket()
 
     # extract the source and destination IP addresses
-    source_ip_address = raw_socket.determin_local_host_ip_address()
+    source_ip_address = raw_socket.determine_local_host_ip_address()
     destination_ip_address = determine_destination_ip_address(url)
 
+    # command to check TCP output: sudo tcpdump -i any port 3000 -n -v
     raw_socket.send_syn(source_ip_address, destination_ip_address, 3000)
 
-    tcp_header = raw_socket.receive_synack(source_ip_address, destination_ip_address, 3000)
+    tcp_header = raw_socket.receive_synack(
+        source_ip_address, destination_ip_address, 3000
+    )
 
     raw_socket.send_ack(source_ip_address, destination_ip_address, 3000, tcp_header)
 
-    response_dict = raw_socket.request_for_resource(source_ip_address, destination_ip_address, 3000,
-                                                    tcp_header, raw_socket.determine_url_host(url), path_to_file)
+    response_dict = raw_socket.request_for_resource(
+        source_ip_address,
+        destination_ip_address,
+        3000,
+        tcp_header,
+        raw_socket.determine_url_host(url),
+        path_to_file,
+    )
 
     write_file(file_pointer, response_dict)
-    
 
 
 if __name__ == "__main__":
