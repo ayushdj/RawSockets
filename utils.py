@@ -204,15 +204,20 @@ def determine_destination_ip_address(url):
 
 
 def get_filename(url) -> tuple:
+    """
+    Extract the filename and path given a URL.
+
+    Args:
+        url: url from urllib.parse.
+    Returns:
+        tuple: filename and the path of the url.
+    """
     filename = ""
     path_url = ""
     if not url.path:
         filename = "index.html"
 
-    path_len = len(url.path)
-    last_character = url.path[path_len - 1]
-    # if url includes / in last, create index.html
-    if last_character == "/":
+    if url.path[-1] == "/":
         path_url = "/"
         filename = "index.html"
     else:

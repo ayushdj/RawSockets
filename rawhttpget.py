@@ -1,49 +1,51 @@
 #!/usr/bin/env python3
 import argparse
+import random
+import sys
 import urllib.parse
 
 from RawSocket import MyRawSocket
-from utils import determine_destination_ip_address, get_filename, write_file
+from utils import determine_destination_ip_address, get_filename
 
 
 def main(url):
-    print(f"Input url is: {url}")
-
-    # to do
-    path_to_file = ""
-    file_pointer = None
-    file_pointer, path_to_file = get_filename(urllib.parse.urlsplit(url))
-    print(file_pointer, path_to_file)
-
     # create the instance of the raw socket
     raw_socket = MyRawSocket()
 
     # extract the source and destination IP addresses
     source_ip_address = raw_socket.determine_local_host_ip_address()
     destination_ip_address = determine_destination_ip_address(url)
-
+    # source_port = random.randint(1000, 65565)
+    source_port = 3000
     # command to check TCP output: sudo tcpdump -i any port 3000 -n -v
-    raw_socket.send_syn(source_ip_address, destination_ip_address, 3000)
+    raw_socket.send_syn(source_ip_address, destination_ip_address, source_port)
 
-    tcp_header = raw_socket.receive_synack(
-        source_ip_address, destination_ip_address, 3000
+    # tcp_header = raw_socket.receive_synack(
+    #     source_ip_address, destination_ip_address, source_port
+    # )
+
+    tcp_header = raw_socket.get_synack_send_ack(source_ip_address, destination_ip_address, source_port)
+
+    raw_socket.send_ack(
+        source_ip_address, destination_ip_address, source_port, tcp_header
     )
-
-    raw_socket.send_ack(source_ip_address, destination_ip_address, 3000, tcp_header)
-
+    file_pointer, path_to_file = get_filename(urllib.parse.urlsplit(url))
+    """
     raw_socket.request_for_resource(
         source_ip_address,
         destination_ip_address,
-        3000,
+        source_port,
         tcp_header,
         raw_socket.determine_url_host(url),
         path_to_file,
     )
 
     raw_socket.download_file(
-        source_ip_address, destination_ip_address, 3000, file_pointer
+        source_ip_address, destination_ip_address, source_port, file_pointer
     )
+    """
     raw_socket.close_sockets()
+    sys.exit()
 
 
 if __name__ == "__main__":
