@@ -3,7 +3,7 @@ import struct
 import time
 import urllib.parse
 
-from utils import make_ip_header, make_tcp_header
+from utils import CLRF, make_ip_header, make_tcp_header, write_file
 
 # IP constants
 IP_VERSION = 4
@@ -32,6 +32,10 @@ class MyRawSocket:
         self.receiving_socket = socket.socket(
             socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_TCP
         )
+
+    def close_sockets(self):
+        self.sending_socket.close()
+        self.receiving_socket.close()
 
     def determine_url_host(self, url):
         """
@@ -163,6 +167,181 @@ class MyRawSocket:
         source_port,
         tcp_header,
         hostname,
-        path_url,
+        path,
     ):
-        pass
+        ip_header = make_ip_header(2222, source_ip_address, destination_ip_address)
+        tcp_header = make_tcp_header(
+            source_port, tcp_header[3], tcp_header[2] + 1, 0, 0, 0, 1, 1
+        )
+
+        http_request = "".join(
+            ["GET ", path, " HTTP/1.0", CLRF, "HOST:", hostname + CLRF * 2]
+        )
+
+        if len(http_request) % 2 != 0:
+            http_request += " "
+
+        tcp_header = make_tcp_header(
+            source_port,
+            tcp_header[3],
+            tcp_header[2] + 1,
+            0,
+            0,
+            0,
+            1,
+            1,
+            tcp_header=tcp_header,
+            source_ip=source_ip_address,
+            dest_ip=destination_ip_address,
+            data=http_request.encode(),
+        )
+
+        packet = ip_header + tcp_header + http_request.encode()
+        self.sending_socket.sendto(packet, (destination_ip_address, 0))
+
+    def download_file(self, source_ip, dest_ip, src_port, fp):
+        response_dictionary = {}
+        c = 0
+        while True:
+            # receiving packet from the server
+            received_packet = self.receiving_socket.recvfrom(BUFFER_LENGTH)
+            # packet string from tuple
+            received_packet = received_packet[0]
+            # take first 20 characters for the ip header
+            ip_header = received_packet[0:20]
+            # unpacking the packet
+            iph = struct.unpack("!BBHHHBBH4s4s", ip_header)
+
+            version_ihl = iph[0]
+            ihl = version_ihl & 0xF
+            iph_length = ihl * 4
+            src_addr = socket.inet_ntoa(iph[8])
+            tcp_header = received_packet[iph_length : iph_length + 20]
+            # unpacking the packet
+            tcph = struct.unpack("!HHLLBBHHH", tcp_header)
+
+            # src_port = tcph[0]
+            dest_port = tcph[1]
+            seq_number = tcph[2]
+            doff_reserved = tcph[4]
+            tcph_length = doff_reserved >> 4
+
+            h_size = iph_length + tcph_length * 4
+            data_size = len(received_packet) - h_size
+            if dest_port == src_port and src_addr == dest_ip and data_size > 0:
+                c += 1
+                # get data from the packet
+                data = received_packet[h_size:]
+                # storing the sequence of packets
+                response_dictionary[seq_number] = data
+                # packet for teardown initiation
+                teardown_initiator = ""
+
+                ip_header = make_ip_header(2020, source_ip, dest_ip)
+
+                # tcp header fields
+                tcp_source = src_port  # source port
+                tcp_seq = tcph[3]
+                tcp_ack_seq = seq_number + data_size
+                # tcp flags
+                tcp_fin = 0
+                tcp_syn = 0
+                tcp_rst = 0
+                tcp_psh = 0
+                tcp_ack = 1
+
+                data_for_teardown = ""
+                tcp_header = make_tcp_header(
+                    tcp_source,
+                    tcp_seq,
+                    tcp_ack_seq,
+                    tcp_fin,
+                    tcp_syn,
+                    tcp_rst,
+                    tcp_psh,
+                    tcp_ack,
+                )
+                tcp_header = make_tcp_header(
+                    tcp_source,
+                    tcp_seq,
+                    tcp_ack_seq,
+                    tcp_fin,
+                    tcp_syn,
+                    tcp_rst,
+                    tcp_psh,
+                    tcp_ack,
+                    tcp_header=tcp_header,
+                    source_ip=source_ip,
+                    dest_ip=dest_ip,
+                    data=data_for_teardown.encode(),
+                )
+
+                # final full packet - syn packets dont have any data
+                teardown_initiator = ip_header + tcp_header + data_for_teardown.encode()
+                self.sending_socket.sendto(teardown_initiator, (dest_ip, 0))
+
+            if (
+                (tcph[5] == 17 or tcph[5] == 25)
+                and dest_port == src_port
+                and src_addr == dest_ip
+                and data_size == 0
+            ):
+                # finish the connection
+                # data to be sent during finishing the connection
+                fin_packet = ""
+                ip_header = make_ip_header(2020, source_ip, dest_ip)
+
+                # tcp header fields
+                tcp_source = src_port  # source port
+                tcp_seq = tcph[3]
+                tcp_ack_seq = seq_number + 1
+                # tcp flags
+                tcp_fin = 1
+                tcp_syn = 0
+                tcp_rst = 0
+                tcp_psh = 0
+                tcp_ack = 1
+
+                # data to be sent in final packet
+                data_in_finpacket = ""
+
+                tcp_header = make_tcp_header(
+                    tcp_source,
+                    tcp_seq,
+                    tcp_ack_seq,
+                    tcp_fin,
+                    tcp_syn,
+                    tcp_rst,
+                    tcp_psh,
+                    tcp_ack,
+                )
+                tcp_header = make_tcp_header(
+                    tcp_source,
+                    tcp_seq,
+                    tcp_ack_seq,
+                    tcp_fin,
+                    tcp_syn,
+                    tcp_rst,
+                    tcp_psh,
+                    tcp_ack,
+                    tcp_header=tcp_header,
+                    source_ip=source_ip,
+                    dest_ip=dest_ip,
+                    data=data_in_finpacket.encode(),
+                )
+
+                # final full packet - syn packets dont have any data
+                fin_packet = ip_header + tcp_header + data_in_finpacket.encode()
+                self.sending_socket.sendto(fin_packet, (dest_ip, 0))
+                print("bouta write file")
+                write_file(fp, response_dictionary)
+                break
+            elif (
+                dest_port == src_port
+                and src_addr == dest_ip
+                and data_size == 0
+                and c > 0
+            ):
+                print("bouta write file")
+                write_file(fp, response_dictionary)
+                break

@@ -50,11 +50,13 @@ def write_file(file, response_dict: dict):
         sys.exit()
     # Write the response to the file if valid response code.
     with open(file, "w") as write_file:
+        print(f"opened: {file}")
         ordered_seq = sorted(response_dict.keys())
         for idx, element in enumerate(ordered_seq):
             if idx == 0:
                 write_file.writelines(response_dict[element].split(CLRF)[1])
             write_file.writelines(response_dict[element])
+        print(f"Done writing file at: {file}")
 
 
 def make_tcp_header(
@@ -89,6 +91,9 @@ def make_tcp_header(
         dest_ip (int): IP of destination (optional)
         data: data to get length of to include in header (optional)
     """
+    # Check if source_port is bytes
+    if type(source_port) is bytes:
+        source_port = int.from_bytes(source_port, sys.byteorder)
     # Create the base tcp header
     tcp_dest_port = 80
     tcp_doff = (5 << 4) + 0
@@ -196,3 +201,22 @@ def determine_destination_ip_address(url):
     host_name = returned_tuple.hostname
     destnation_ip_address = socket.gethostbyname(host_name)
     return destnation_ip_address
+
+
+def get_filename(url) -> tuple:
+    filename = ""
+    path_url = ""
+    if not url.path:
+        filename = "index.html"
+
+    path_len = len(url.path)
+    last_character = url.path[path_len - 1]
+    # if url includes / in last, create index.html
+    if last_character == "/":
+        path_url = "/"
+        filename = "index.html"
+    else:
+        url = url.path
+        split_name = url.rsplit("/", 1)
+        filename = split_name[1]
+    return filename, path_url

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import argparse
+import urllib.parse
 
 from RawSocket import MyRawSocket
-from utils import determine_destination_ip_address, write_file
+from utils import determine_destination_ip_address, get_filename, write_file
 
 
 def main(url):
@@ -10,8 +11,9 @@ def main(url):
 
     # to do
     path_to_file = ""
-
     file_pointer = None
+    file_pointer, path_to_file = get_filename(urllib.parse.urlsplit(url))
+    print(file_pointer, path_to_file)
 
     # create the instance of the raw socket
     raw_socket = MyRawSocket()
@@ -29,7 +31,7 @@ def main(url):
 
     raw_socket.send_ack(source_ip_address, destination_ip_address, 3000, tcp_header)
 
-    response_dict = raw_socket.request_for_resource(
+    raw_socket.request_for_resource(
         source_ip_address,
         destination_ip_address,
         3000,
@@ -38,7 +40,10 @@ def main(url):
         path_to_file,
     )
 
-    write_file(file_pointer, response_dict)
+    raw_socket.download_file(
+        source_ip_address, destination_ip_address, 3000, file_pointer
+    )
+    raw_socket.close_sockets()
 
 
 if __name__ == "__main__":
