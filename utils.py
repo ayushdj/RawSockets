@@ -10,7 +10,7 @@ IP_HEADER_LENGTH = 5
 IP_LENGTH_OFFSET = 20
 IP_VERSION = 4
 TCP_PROTOCOL = socket.IPPROTO_TCP
-MAX_WINDOW_SIZE = 1000
+MAX_WINDOW_SIZE = 5840
 
 
 def calculate_checksum(message):
@@ -91,12 +91,9 @@ def make_tcp_header(
         dest_ip (int): IP of destination (optional)
         data: data to get length of to include in header (optional)
     """
-    # Check if source_port is bytes
-    if type(source_port) is bytes:
-        source_port = int.from_bytes(source_port, sys.byteorder)
     # Create the base tcp header
     tcp_dest_port = 80
-    tcp_doff = (5 << 4) + 0
+    tcp_doff = 5 << 4
     tcp_urg_ptr = 0
     tcp_flags = (
         finish_flag
@@ -149,7 +146,7 @@ def make_tcp_header(
                 ack_number,
                 tcp_doff,
                 tcp_flags,
-                socket.htons(MAX_WINDOW_SIZE),  # window size
+                socket.htons(MAX_WINDOW_SIZE),
             )
             + struct.pack("!H", calculate_checksum(packet))
             + struct.pack("!H", tcp_urg_ptr)
@@ -172,7 +169,7 @@ def make_ip_header(id, src_ip, dest_ip, data="") -> bytes:
     """
     # IPv4 header fields
     tos = 0
-    total_len = len(data) + IP_LENGTH_OFFSET
+    total_len = len(data)  # + IP_LENGTH_OFFSET
     fragmentation_offset = 0
     ip_ttl = 255
     checksum = 0
@@ -181,7 +178,7 @@ def make_ip_header(id, src_ip, dest_ip, data="") -> bytes:
 
     header = struct.pack(
         "!BBHHHBBH4s4s",
-        (IP_VERSION << 4) + IP_HEADER_LENGTH + 0,
+        (IP_VERSION << 4) + IP_HEADER_LENGTH,
         tos,
         total_len,
         id,

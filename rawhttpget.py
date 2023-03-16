@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import os
 import random
 import sys
 import urllib.parse
@@ -9,15 +10,15 @@ from utils import determine_destination_ip_address, get_filename
 
 
 def main(url):
+    os.system("sudo iptables -A OUTPUT -p tcp --tcp-flags RST RST -j DROP")
     # create the instance of the raw socket
     raw_socket = MyRawSocket()
 
     # extract the source and destination IP addresses
     source_ip_address = raw_socket.determine_local_host_ip_address()
     destination_ip_address = determine_destination_ip_address(url)
-    # source_port = random.randint(1000, 65565)
-    source_port = 3000
-    # command to check TCP output: sudo tcpdump -i any port 3000 -n -v
+    source_port = random.randint(1000, 65565)
+    # Monitor tcpdump with: sudo tcpdump -vv -n host 204.44.192.60, can use this too
     raw_socket.send_syn(source_ip_address, destination_ip_address, source_port)
 
     tcp_header = raw_socket.receive_synack(
@@ -27,8 +28,8 @@ def main(url):
     raw_socket.send_ack(
         source_ip_address, destination_ip_address, source_port, tcp_header
     )
+
     file_pointer, path_to_file = get_filename(urllib.parse.urlsplit(url))
-    """
     raw_socket.request_for_resource(
         source_ip_address,
         destination_ip_address,
@@ -41,7 +42,6 @@ def main(url):
     raw_socket.download_file(
         source_ip_address, destination_ip_address, source_port, file_pointer
     )
-    """
     raw_socket.close_sockets()
     sys.exit()
 
