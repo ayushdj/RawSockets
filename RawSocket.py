@@ -289,7 +289,7 @@ class MyRawSocket:
         )
 
         http_request = "".join(
-            ["GET ", path, " HTTP/1.1", CLRF, "HOST:", hostname + CLRF * 2]
+            ["GET ", path, " HTTP/1.1", CLRF, "HOST: ", hostname + CLRF * 2]
         )
 
         if len(http_request) % 2 != 0:
@@ -301,8 +301,7 @@ class MyRawSocket:
             source_port, tcp_header[3], tcp_header[2] + 1, 0, 0, 0, 1, 1
         )
 
-        tcp_header = create_tcp_header_with_checksum(
-            tcp_header,
+        tcp_header = make_tcp_header_with_checksum(
             source_port,
             tcp_header[3],
             tcp_header[2] + 1,
@@ -311,9 +310,10 @@ class MyRawSocket:
             0,
             1,
             1,
-            source_ip_address,
-            destination_ip_address,
-            http_request,
+            tcp_header=tcp_header,
+            source_ip=source_ip_address,
+            dest_ip=destination_ip_address,
+            data=http_request.encode(),
         )
 
         packet = ip_header + tcp_header + http_request.encode()
