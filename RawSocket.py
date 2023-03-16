@@ -59,8 +59,18 @@ class MyRawSocket:
 
         # Make initial TCP header
         tcp_header = make_tcp_header(source_port, 0, 0, 0, 1, 0, 0, 0)
-        tcp_header = create_tcp_header_with_checksum(
-            tcp_header, source_port, 0, 0, 0, 1, 0, 0, 0, source_ip, dest_ip, ""
+        tcp_header = make_tcp_header_with_checksum(
+            source_port,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            tcp_header=tcp_header,
+            source_ip=source_ip,
+            dest_ip=dest_ip,
         )
 
         # final full packet - syn packets dont have any data
