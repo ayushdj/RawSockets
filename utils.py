@@ -246,7 +246,6 @@ def get_filename(url) -> tuple:
     # Set defaults
     file_path = "/"
     file_name = "index.html"
-    print(f"URL path: {url.path}")
 
     if url.path != "/":
         file_path = url.path
