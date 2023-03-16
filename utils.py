@@ -14,7 +14,6 @@ TCP_DEST_PORT = 80
 TCP_DATA_OFFSET = 5
 MAX_WINDOW_SIZE = 5840
 
-
 def calculate_checksum(message):
     """
     Calculate the checksum of the given message.
@@ -24,19 +23,25 @@ def calculate_checksum(message):
     Returns:
         checksum: integer checksum value
     """
-    # Initialize checksum to 0
+    # if the message length is odd, add a null byte at the end
+    if len(message) % 2 != 0:
+        message += b'\x00'
+
+    # initialize the checksum to zero
     checksum = 0
 
-    # For every 2 bytes, fold together with leftshift of 8 to make 8byte
+    # iterate over every 16-bit chunk of the message
     for i in range(0, len(message), 2):
-        fold = message[i] + (message[i + 1] << 8)
-        checksum += fold
+        # combine the two bytes into a 16-bit integer
+        word = message[i] + (message[i+1] << 8)
+        # add the 16-bit integer to the checksum
+        checksum += word
+        # wrap the checksum if it overflows
+        checksum = (checksum & 0xFFFF) + (checksum >> 16)
 
-    # Fold 32 bit sum into 16 bit
-    checksum = (checksum >> 16) + (checksum & 0xFFFF)
-    checksum += checksum << 16
-    # Take one's complement
+    # take the one's complement of the checksum
     checksum = ~checksum & 0xFFFF
+
     return checksum
 
 
