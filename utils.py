@@ -17,7 +17,7 @@ MAX_WINDOW_SIZE = 5840
 def calculate_checksum(message):
     # if the message length is odd, add a null byte at the end
     if len(message) % 2 != 0:
-        message += 0x0
+        message += 0x00
 
     # initialize the checksum to zero
     checksum = 0
