@@ -195,7 +195,7 @@ def make_tcp_header_with_checksum(
             checksum,
             tcp_urg_ptr,
         )
-        + struct.pack("H", calculate_checksum(packet))
+        + struct.pack("!H", calculate_checksum(packet))
         + struct.pack("!H", tcp_urg_ptr)
     )
 
