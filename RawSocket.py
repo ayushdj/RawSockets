@@ -113,59 +113,32 @@ class MyRawSocket:
         )
         self.sending_socket.sendto(ip_header + tcp_header, (dest_ip, 0))
 
-    # TODO refactor into multiple functions
     def receive_synack(self, source_ip, dest_ip, src_port):
         """
         Receive a SYNACK from the server.
         """
-        # packet = self.receiving_socket.recvfrom(BUFFER_LENGTH)[0]
-        # ip_header_unpack = struct.unpack("!BBHHHBBH4s4s", packet[:20])
-        # header_len = ip_header_unpack[0] & 0xF
-        # address_dest = socket.inet_ntoa(ip_header_unpack[8])
-        # address_source = socket.inet_ntoa(ip_header_unpack[9])
-        # tcp_header = packet[header_len * 4 : header_len * 4 + 20]
-        # tcp_header_unpack = struct.unpack("!HHLLBBHHH", tcp_header)
-        #
-        # if (
-        #     address_source == source_ip
-        #     and address_dest == dest_ip
-        #     and tcp_header_unpack[5] == 18
-        #     and src_port == tcp_header_unpack[1]
-        #     and ((self.syn_start_time - time.time()) < 60)
-        # ):
-        #     print("send_ack called")
-        #     print(tcp_header_unpack)
-        #     self.send_ack(src_port, source_ip, dest_ip, tcp_header_unpack)
-        # else:
-        #     print("send_syn called")
-        #     self.send_syn(source_ip, dest_ip, src_port)
-        # return
 
-        ### OLD IMPLEMENTATION
         packet = self.receiving_socket.recvfrom(BUFFER_LENGTH)[0]
-        ip_header = struct.unpack("!BBHHHBBH4s4s", packet[:20])
+        ip_header = packet[:20]
+        tcp_header = packet[20:40]
+        data = packet[40:]
         version = (ip_header[0] >> 4) & 0xF
         ip_header_len = version * 4
-        source_ip_addr = socket.inet_ntoa(ip_header[8])
-        dest_ip_addr = socket.inet_ntoa(ip_header[9])
+
+        source_ip_addr, dest_ip_addr = socket.inet_ntoa(ip_header[12:16]), socket.inet_ntoa(ip_header[16:20])
+        tcp_src_port, tcp_dest_port = struct.unpack("!HH", tcp_header[0:4])
+        tcp_flags = struct.unpack("!B", tcp_header[13:14])
+
         tcp_header = packet[ip_header_len : ip_header_len + 20]
         tcp_header = struct.unpack("!HHLLBBHHH", tcp_header)
 
-        print(tcp_header)
-
-        print(f"Source IP: {source_ip_addr} == {dest_ip}")
-        print(f"Dest IP: {dest_ip_addr} == {source_ip}")
-        print(f"Header 5: {tcp_header[5]} == 18")
-        print(f"Source Port: {src_port} == {tcp_header[1]}")
-        print(f"Time Diff: {self.syn_start_time - time.time()} < 60")
-
         if (
-            source_ip_addr == dest_ip
-            and dest_ip_addr == source_ip
-            and tcp_header[5] == 18
-            and src_port == tcp_header[1]
-            and self.syn_start_time - time.time() < 60
+            tcp_src_port == 80 and
+            tcp_dest_port == src_port and
+            tcp_flags == 0x12 and
+            self.syn_start_time - time.time() < 60
         ):
+            print("Sending ACK")
             self.send_ack(source_ip, dest_ip, src_port, tcp_header)
         else:
             self.send_syn(source_ip, dest_ip, src_port)

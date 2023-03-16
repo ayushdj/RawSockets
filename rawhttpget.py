@@ -25,11 +25,8 @@ def main(url):
         source_ip_address, destination_ip_address, source_port
     )
 
-    raw_socket.send_ack(
-        source_ip_address, destination_ip_address, source_port, tcp_header
-    )
-
     file_pointer, path_to_file = get_filename(urllib.parse.urlsplit(url))
+
     raw_socket.request_for_resource(
         source_ip_address,
         destination_ip_address,
