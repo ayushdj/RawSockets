@@ -183,27 +183,24 @@ def make_tcp_header_with_checksum(
         + data
     )
 
-    checksum = calculate_checksum(packet)
-
-    tcp_header_with_checksum = (
-                struct.pack(
-                        "!HHLLBBH",
-                        src_port,
-                        TCP_DEST_PORT,
-                        sequence_num,
-                        ack_num,
-                        tcp_offset,
-                        flags,
-                        window,
-                )
-                + struct.pack("H", checksum)
-                + struct.pack("!H", tcp_urg_ptr)
+    # Return the tcp_header packed
+    return (
+        struct.pack(
+            "!HHLLBBH",
+            src_port,
+            TCP_DEST_PORT,
+            sequence_num,
+            ack_num,
+            tcp_offset,
+            flags,
+            window,
         )
+        + struct.pack("H", calculate_checksum(packet))
+        + struct.pack("!H", tcp_urg_ptr)
+    )
 
-    return tcp_header_with_checksum
 
-
-def make_ip_header(id, src_ip, dest_ip, data="") -> bytes:
+def make_ip_header(id, src_ip, dest_ip, data=b"") -> bytes:
     """
     Generate IP header.
 
@@ -215,56 +212,19 @@ def make_ip_header(id, src_ip, dest_ip, data="") -> bytes:
     Returns
         IP header packed
     """
-    # IPv4 header fields
-    # tos = 0
-    # total_len = len(data)  # + IP_LENGTH_OFFSET
-    # fragmentation_offset = 0
-    # ip_ttl = 255
-    # checksum = 0
-    # src_ip_num = socket.inet_aton(str(src_ip))
-    # dest_ip_num = socket.inet_aton(dest_ip)
-
-    # header = struct.pack(
-    #     "!BBHHHBBH4s4s",
-    #     (IP_VERSION << 4) + IP_HEADER_LENGTH,
-    #     tos,
-    #     total_len,
-    #     id,
-    #     fragmentation_offset,
-    #     ip_ttl,
-    #     TCP_PROTOCOL,
-    #     checksum,
-    #     src_ip_num,
-    #     dest_ip_num,
-    # )
-
-    # return header
-    IP_HEADER_LEN = 5
-    IP_VERSION = 4
-    IP_TYPE_OF_SERVICE = 0
-    IP_TOTAL_LENGTH = 0
-    IP_ID = id
-    IP_FRAGMENTAION_OFFSET = 0
-    IP_TTL = 255
-    IP_PROTOCOL = socket.IPPROTO_TCP
-    IP_CHECKSUM = 0
-    IP_SRC_ADDR = socket.inet_aton(src_ip)
-    IP_DST_ADDR = socket.inet_aton(str(dest_ip))
-    IP_IHL_VER = (IP_VERSION << 4) + IP_HEADER_LEN
-    ip_header = struct.pack(
+    return struct.pack(
         "!BBHHHBBH4s4s",
-        IP_IHL_VER,
-        IP_TYPE_OF_SERVICE,
-        IP_TOTAL_LENGTH,
-        IP_ID,
-        IP_FRAGMENTAION_OFFSET,
-        IP_TTL,
-        IP_PROTOCOL,
-        IP_CHECKSUM,
-        IP_SRC_ADDR,
-        IP_DST_ADDR,
+        (IP_VERSION << 4) + IP_HEADER_LENGTH,
+        0,                                      # type of service
+        len(data) + IP_LENGTH_OFFSET,           # size
+        id,                                     # packet id
+        0,                                      # fragmentation offset
+        255,                                    # Time to live
+        TCP_PROTOCOL,
+        0,                                      # checksum
+        socket.inet_aton(src_ip),               # source IP as bytes
+        socket.inet_aton(dest_ip),              # destination IP as bytes
     )
-    return ip_header
 
 
 def determine_destination_ip_address(url):
