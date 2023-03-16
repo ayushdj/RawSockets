@@ -79,13 +79,6 @@ def make_tcp_header(
     Flags Reference: https://www.site24x7.com/learn/linux/tcp-flags.html
 
     Args:
-        src_port (int): port of source
-        sequence_num (int): number in sequence
-        ack_num (int): acknowledgement number
-        finish_flag (int): determines if finished
-        reset_flag (int): determines whether to drop connection and reset
-        push_flag (int): determines if this header is pushing data
-        ack_flag (int): determines acknowledgement
 
     Returns:
         tcp_header as packed bytes
