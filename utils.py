@@ -195,8 +195,6 @@ def make_tcp_header_with_checksum(
             tcp_offset,
             flags,
             window,
-            checksum,
-            tcp_urg_ptr,
         )
         + struct.pack("H", checksum)
         + struct.pack("!H", tcp_urg_ptr)
