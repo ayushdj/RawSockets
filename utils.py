@@ -247,6 +247,7 @@ def get_filename(url) -> tuple:
     file_name = "index.html"
     if not url.path:
         file_path = url.path
+        print(f"URL path: {url.path}")
         if url.path[-1] != "/":
             file_name = url.path.rsplit("/", 1)[1]
 
