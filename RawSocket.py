@@ -145,8 +145,7 @@ class MyRawSocket:
             tcp_psh,
             tcp_ack,
         )
-        tcp_header = create_tcp_header_with_checksum(
-            tcp_header,
+        tcp_header = make_tcp_header_with_checksum(
             tcp_source_port,
             tcp_seq,
             tcp_ack_seq,
@@ -155,9 +154,9 @@ class MyRawSocket:
             tcp_rst,
             tcp_psh,
             tcp_ack,
-            source_ip,
-            dest_ip,
-            "",
+            tcp_header=tcp_header,
+            source_ip=source_ip,
+            dest_ip=dest_ip,
         )
         acknowledgement_packet = ip_header + tcp_header
 
