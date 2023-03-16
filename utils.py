@@ -14,25 +14,25 @@ MAX_WINDOW_SIZE = 5840
 
 
 def calculate_checksum(message):
-    # """
-    # Calculate the checksum of the given message.
+    """
+    Calculate the checksum of the given message.
 
-    # Args:
-    #     message: characters to calculate checksum for.
-    # Returns:
-    #     checksum: integer checksum value
-    # """
-    # # If the length of the message is odd, pad with a zero byte
-    # if len(message) % 2 != 0:
-    #     message += b"\0"
-    # # Calculate the one's complement sum of the message contents
-    # checksum = sum(struct.unpack("!{}H".format(len(message) // 2), message))
-    # # Fold the 32-bit sum into 16 bits by adding the carry bits
-    # checksum = (checksum >> 16) + (checksum & 0xFFFF)
-    # checksum += checksum >> 16
-    # # Take the one's complement of the result
-    # checksum = (~checksum) & 0xFFFF
-    # return checksum
+    Args:
+         message: characters to calculate checksum for.
+    Returns:
+        checksum: integer checksum value
+    """
+    # If the length of the message is odd, pad with a zero byte
+    if len(message) % 2 != 0:
+        message += b"\0"
+    # Calculate the one's complement sum of the message contents
+    checksum = sum(struct.unpack("!{}H".format(len(message) // 2), message))
+    # Fold the 32-bit sum into 16 bits by adding the carry bits
+    checksum = (checksum >> 16) + (checksum & 0xFFFF)
+    checksum += checksum >> 16
+    # Take the one's complement of the result
+    checksum = (~checksum) & 0xFFFF
+    return checksum
     csum = 0
 
     # loop taking 2 characters at a time
