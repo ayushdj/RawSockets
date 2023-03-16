@@ -10,6 +10,8 @@ IP_HEADER_LENGTH = 5
 IP_LENGTH_OFFSET = 20
 IP_VERSION = 4
 TCP_PROTOCOL = socket.IPPROTO_TCP
+TCP_DEST_PORT = 80
+TCP_DATA_OFFSET = 5
 MAX_WINDOW_SIZE = 5840
 
 
@@ -63,215 +65,146 @@ def write_file(file, response_dict: dict):
 
 
 def make_tcp_header(
-    src_port, seq, ackno, fin_flag, syn_flag, rst_flag, psh_flag, ack_flag
-):
-    TCP_SOURCE = src_port
-    TCP_DEST = 80
-    TCP_SEQ = seq
-    TCP_ACK_SEQ = ackno
-    TCP_DOFF = 5
-    # tcp flags
-    TCP_FIN = fin_flag
-    TCP_SYN = syn_flag
-    TCP_RST = rst_flag
-    TCP_PSH = psh_flag
-    TCP_ACK = ack_flag
-    TCP_URG = 0
-    TCP_WINDOW = socket.htons(5840)  # maximum allowed window size
-    TCP_CHECKSUM = 0
-    TCP_URG_PTR = 0
-    TCP_OFFSET_RES = (TCP_DOFF << 4) + 0
-    TCP_FLAGS = (
-        TCP_FIN
-        + (TCP_SYN << 1)
-        + (TCP_RST << 2)
-        + (TCP_PSH << 3)
-        + (TCP_ACK << 4)
-        + (TCP_URG << 5)
-    )
-
-    tcp_header = struct.pack(
-        "!HHLLBBHHH",
-        TCP_SOURCE,
-        TCP_DEST,
-        TCP_SEQ,
-        TCP_ACK_SEQ,
-        TCP_OFFSET_RES,
-        TCP_FLAGS,
-        TCP_WINDOW,
-        TCP_CHECKSUM,
-        TCP_URG_PTR,
-    )
-    return tcp_header
-
-
-def create_tcp_header_with_checksum(
-    tcp_header,
     src_port,
-    seq,
-    ackno,
-    fin_flag,
+    sequence_num,
+    ack_num,
+    finish_flag,
     syn_flag,
-    rst_flag,
-    psh_flag,
+    reset_flag,
+    push_flag,
     ack_flag,
-    source_ip,
-    dest_ip,
-    data,
-):
-    TCP_SOURCE = src_port
-    TCP_DEST = 80
-    TCP_SEQ = seq
-    TCP_ACK_SEQ = ackno
-    TCP_DOFF = 5
-    # tcp flags
-    TCP_FIN = fin_flag
-    TCP_SYN = syn_flag
-    TCP_RST = rst_flag
-    TCP_PSH = psh_flag
-    TCP_ACK = ack_flag
-    TCP_URG = 0
-    TCP_WINDOW = socket.htons(5840)  # maximum allowed window size
-    TCP_CHECKSUM = 0
-    TCP_URG_PTR = 0
-    TCP_OFFSET_RES = (TCP_DOFF << 4) + 0
-    TCP_FLAGS = (
-        TCP_FIN
-        + (TCP_SYN << 1)
-        + (TCP_RST << 2)
-        + (TCP_PSH << 3)
-        + (TCP_ACK << 4)
-        + (TCP_URG << 5)
+) -> bytes:
+    """
+    Make a TCP header and return the packed bytes.
+    Flags Reference: https://www.site24x7.com/learn/linux/tcp-flags.html
+
+    Args:
+        src_port (int): port of source
+        sequence_num (int): number in sequence
+        ack_num (int): acknowledgement number
+        finish_flag (int): determines if finished
+        reset_flag (int): determines whether to drop connection and reset
+        push_flag (int): determines if this header is pushing data
+        ack_flag (int): determines acknowledgement
+
+    Returns:
+        tcp_header as packed bytes
+    """
+    tcp_urg_ptr = 0
+    window = socket.htons(MAX_WINDOW_SIZE)
+    checksum = 0
+    tcp_offset = (TCP_DATA_OFFSET << 4) + 0
+    # Pack all the flags into one using shift
+    flags = (
+        finish_flag
+        + (syn_flag << 1)
+        + (reset_flag << 2)
+        + (push_flag << 3)
+        + (ack_flag << 4)
+        + (tcp_urg_ptr << 5)
+    )
+    return struct.pack(
+        "!HHLLBBHHH",
+        src_port,
+        TCP_DEST_PORT,
+        sequence_num,
+        ack_num,
+        tcp_offset,
+        flags,
+        window,
+        checksum,
+        tcp_urg_ptr,
     )
 
-    request_data = data
-    # pseudo header fields
-    s_addr = socket.inet_aton(source_ip)
-    d_addr = socket.inet_aton(dest_ip)
-    placehold = 0
-    used_prtcl = socket.IPPROTO_TCP
-    length_of_tcp = len(tcp_header) + len(request_data)
 
-    # packing the packet
-    packet_maker = struct.pack(
-        "!4s4sBBH", s_addr, d_addr, placehold, used_prtcl, length_of_tcp
-    )
-    packet_maker = packet_maker + tcp_header + bytes(request_data, "utf-8")
+def make_tcp_header_with_checksum(
+    src_port,
+    sequence_num,
+    ack_num,
+    finish_flag,
+    syn_flag,
+    reset_flag,
+    push_flag,
+    ack_flag,
+    tcp_header=None,
+    source_ip=None,
+    dest_ip=None,
+    data=b"",
+) -> bytes:
+    """
+    Make a TCP header also including the checksum for the passed in the TCP header.
+    Flags Reference: https://www.site24x7.com/learn/linux/tcp-flags.html
 
-    TCP_CHECKSUM = calculate_checksum(packet_maker)
+    Args:
+        src_port (int): port of source
+        sequence_num (int): number in sequence
+        ack_num (int): acknowledgement number
+        finish_flag (int): determines if finished
+        reset_flag (int): determines whether to drop connection and reset
+        push_flag (int): determines if this header is pushing data
+        ack_flag (int): determines acknowledgement
+        tcp_header (bytes): passed in tcp_header to calculate the checksum for (optional)
+        source_ip: IP address of source (optional)
+        dest_ip: IP address of destination (optional)
+        data (bytes): data to be included in the request (optional)
 
-    # make the tcp header again and fill the correct checksum - remember checksum is NOT in network byte order
-    tcp_header = (
-        struct.pack(
-            "!HHLLBBH",
-            TCP_SOURCE,
-            TCP_DEST,
-            TCP_SEQ,
-            TCP_ACK_SEQ,
-            TCP_OFFSET_RES,
-            TCP_FLAGS,
-            TCP_WINDOW,
+    Returns:
+        tcp_header as packed bytes including the checksum
+    """
+    # Verify args have been passed in properly
+    if not tcp_header or not source_ip or not dest_ip:
+        print(
+            f"[ERROR]: missing parameters for tcp_header | source_ip | dest_ip. Found {tcp_header}, {source_ip}, and {dest_ip}"
         )
-        + struct.pack("H", TCP_CHECKSUM)
-        + struct.pack("!H", TCP_URG_PTR)
+        sys.exit()
+
+    tcp_urg_ptr = 0
+    window = socket.htons(MAX_WINDOW_SIZE)
+    checksum = 0
+    tcp_offset = (TCP_DATA_OFFSET << 4) + 0
+    # Pack all the flags into one using shift
+    flags = (
+        finish_flag
+        + (syn_flag << 1)
+        + (reset_flag << 2)
+        + (push_flag << 3)
+        + (ack_flag << 4)
+        + (tcp_urg_ptr << 5)
     )
-    return tcp_header
 
+    source_address = socket.inet_aton(source_ip)
+    dest_address = socket.inet_aton(dest_ip)
 
-# def make_tcp_header(
-#     source_port,
-#     sequence_number,
-#     ack_number,
-#     finish_flag,
-#     syn_flag,
-#     reset_flag,
-#     push_flag,
-#     ack_flag,
-#     tcp_header=None,
-#     source_ip=None,
-#     dest_ip=None,
-#     data=b"",
-# ) -> bytes:
-#     """
-#     Generate a TCP Header and optionally include a checksum if an existing header is passed in.
-#     Reference: https://www.site24x7.com/learn/linux/tcp-flags.html
+    # Create the packet
+    packet = (
+        struct.pack(
+            "!4s4sBBH",
+            source_address,
+            dest_address,
+            0,
+            TCP_PROTOCOL,
+            len(tcp_header) + len(data),
+        )
+        + tcp_header
+        + data
+    )
 
-#     Args:
-#         source_port (int): TCP port from source
-#         sequence_number (int): number in sequence network order
-#         ack_number (int): number in sequence for acknowledgement
-#         finish_flag (int): terminates TCP connection
-#         syn_flag (int): create TCP connection (handshake)
-#         reset_flag (int): terminate the connection andn drop data in transit
-#         push_flag (int): bypass network buffering
-#         ack_flag (int): acknowledge data reception or synchronization packets
-#         tcp_header (bytes): packed TCP header to add checksum to (optional)
-#         source_ip (int): IP of source (optional)
-#         dest_ip (int): IP of destination (optional)
-#         data: data to get length of to include in header (optional)
-#     """
-#     # Create the base tcp header
-#     tcp_dest_port = 80
-#     tcp_doff = 5 << 4
-#     tcp_urg_ptr = 0
-#     tcp_flags = (
-#         finish_flag
-#         + (syn_flag << 1)
-#         + (reset_flag << 2)
-#         + (push_flag << 3)
-#         + (ack_flag << 4)
-#         + (tcp_urg_ptr << 5)
-#     )
-
-#     tcp_header = struct.pack(
-#         "!HHLLBBHHH",
-#         source_port,
-#         tcp_dest_port,
-#         sequence_number,
-#         ack_number,
-#         tcp_doff,
-#         tcp_flags,
-#         socket.htons(MAX_WINDOW_SIZE),  # window size
-#         0,  # checksum is 0 to begin
-#         tcp_urg_ptr,
-#     )
-
-#     # Optionally include a checksum to the tcp header if optional fields passed in.
-#     if tcp_header and source_ip and dest_ip:
-#         source_address = socket.inet_aton(source_ip)
-#         destination_address = socket.inet_aton(dest_ip)
-#         header_size = len(tcp_header) + len(data)
-
-#         # Construct the packet with corresponding fields
-#         packet = (
-#             struct.pack(
-#                 "!4s4sBBH",
-#                 source_address,
-#                 destination_address,
-#                 0,
-#                 TCP_PROTOCOL,
-#                 header_size,
-#             )
-#             + tcp_header
-#             + data
-#         )
-
-#         tcp_header = (
-#             struct.pack(
-#                 "!HHLLBBH",
-#                 source_port,
-#                 tcp_dest_port,
-#                 sequence_number,
-#                 ack_number,
-#                 tcp_doff,
-#                 tcp_flags,
-#                 socket.htons(MAX_WINDOW_SIZE),
-#             )
-#             + struct.pack("!H", calculate_checksum(packet))
-#             + struct.pack("!H", tcp_urg_ptr)
-#         )
-
-#     return tcp_header
+    return (
+        struct.pack(
+            "!HHLLBBHHH",
+            src_port,
+            TCP_DEST_PORT,
+            sequence_num,
+            ack_num,
+            tcp_offset,
+            flags,
+            window,
+            checksum,
+            tcp_urg_ptr,
+        )
+        + struct.pack("H", calculate_checksum(packet))
+        + struct.pack("!H", tcp_urg_ptr)
+    )
 
 
 def make_ip_header(id, src_ip, dest_ip, data="") -> bytes:
