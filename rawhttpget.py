@@ -30,6 +30,7 @@ def main(url):
     )
 
     file_pointer, path_to_file = get_filename(urllib.parse.urlsplit(url))
+    print(file_pointer, path_to_file)
 
     raw_socket.request_for_resource(
         source_ip_address,
