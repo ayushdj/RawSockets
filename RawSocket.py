@@ -385,7 +385,7 @@ class MyRawSocket:
                     tcp_psh,
                     tcp_ack,
                 )
-                tcp_header = make_tcp_header(
+                tcp_header = make_tcp_header_with_checksum(
                     tcp_source,
                     tcp_seq,
                     tcp_ack_seq,
@@ -440,7 +440,7 @@ class MyRawSocket:
                     tcp_psh,
                     tcp_ack,
                 )
-                tcp_header = make_tcp_header(
+                tcp_header = make_tcp_header_with_checksum(
                     tcp_source,
                     tcp_seq,
                     tcp_ack_seq,
