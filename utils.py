@@ -27,7 +27,7 @@ def calculate_checksum(message):
 
     # For every 2 bytes, fold together with leftshift of 8 to make 8byte
     for i in range(0, len(message), 2):
-        fold = message[i] + message[i + 1] << 8
+        fold = message[i] + (message[i + 1] << 8)
         checksum += fold
 
     # Fold 32 bit sum into 16 bit
