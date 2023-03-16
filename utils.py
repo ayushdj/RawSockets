@@ -165,6 +165,7 @@ def make_tcp_header_with_checksum(
         + (tcp_urg_ptr << 5)
     )
 
+    # Extract the source/dest IP addresses as bytes
     source_address = socket.inet_aton(source_ip)
     dest_address = socket.inet_aton(dest_ip)
 
@@ -182,6 +183,8 @@ def make_tcp_header_with_checksum(
         + data
     )
 
+    checksum = calculate_checksum(packet)
+
     return (
         struct.pack(
             "!HHLLBBHHH",
@@ -195,7 +198,7 @@ def make_tcp_header_with_checksum(
             checksum,
             tcp_urg_ptr,
         )
-        + struct.pack("!H", calculate_checksum(packet))
+        + struct.pack("H", checksum)
         + struct.pack("!H", tcp_urg_ptr)
     )
 
