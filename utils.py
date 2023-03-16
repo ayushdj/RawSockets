@@ -25,7 +25,7 @@ def calculate_checksum(message):
     # iterate over every 16-bit chunk of the message
     for i in range(0, len(message), 2):
         # combine the two bytes into a 16-bit integer
-        word = (message[i] << 8) + message[i+1]
+        word = message[i] + (message[i+1] << 8)
         # add the 16-bit integer to the checksum
         checksum += word
         # wrap the checksum if it overflows
