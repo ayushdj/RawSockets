@@ -243,11 +243,13 @@ def get_filename(url) -> tuple:
     Returns:
         tuple: filename and the path of the url.
     """
+    # Set defaults
     file_path = "/"
     file_name = "index.html"
+    print(f"URL path: {url.path}")
+
     if not url.path:
         file_path = url.path
-        print(f"URL path: {url.path}")
         if url.path[-1] != "/":
             file_name = url.path.rsplit("/", 1)[1]
 
