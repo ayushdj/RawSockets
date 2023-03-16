@@ -185,20 +185,22 @@ def make_tcp_header_with_checksum(
 
     checksum = calculate_checksum(packet)
 
-    return (
-        struct.pack(
-            "!HHLLBBHHH",
-            src_port,
-            TCP_DEST_PORT,
-            sequence_num,
-            ack_num,
-            tcp_offset,
-            flags,
-            window,
+    tcp_header_with_checksum = (
+                struct.pack(
+                        "!HHLLBBH",
+                        src_port,
+                        TCP_DEST_PORT,
+                        sequence_num,
+                        ack_num,
+                        tcp_offset,
+                        flags,
+                        window,
+                )
+                + struct.pack("H", checksum)
+                + struct.pack("!H", tcp_urg_ptr)
         )
-        + struct.pack("H", checksum)
-        + struct.pack("!H", tcp_urg_ptr)
-    )
+
+    return tcp_header_with_checksum
 
 
 def make_ip_header(id, src_ip, dest_ip, data="") -> bytes:
