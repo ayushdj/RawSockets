@@ -301,6 +301,8 @@ class MyRawSocket:
         if len(http_request) % 2 != 0:
             http_request += " "
 
+        # src_port, seq, ackno, fin_flag, syn_flag, rst_flag, psh_flag,
+        # ack_flag):
         tcp_header = make_tcp_header(
             source_port,
             tcp_header[3],
@@ -309,11 +311,22 @@ class MyRawSocket:
             0,
             0,
             1,
+            1
+        )
+
+        tcp_header = create_tcp_header_with_checksum(
+            tcp_header,
+            source_port,
+            tcp_header[3],
+            tcp_header[2] + 1,
+            0,
+            0,
+            0,
             1,
-            tcp_header=tcp_header,
-            source_ip=source_ip_address,
-            dest_ip=destination_ip_address,
-            data=http_request.encode(),
+            1,
+            source_ip_address,
+            destination_ip_address,
+            http_request
         )
 
         packet = ip_header + tcp_header + http_request.encode()
@@ -348,7 +361,11 @@ class MyRawSocket:
 
             h_size = iph_length + tcph_length * 4
             data_size = len(received_packet) - h_size
+            print(f"{dest_port} == {src_port}")
+            print(f"{src_addr} == {dest_ip}")
+            print(f"{data_size} > 0")
             if dest_port == src_port and src_addr == dest_ip and data_size > 0:
+                print("inside first if statement")
                 c += 1
                 # get data from the packet
                 data = received_packet[h_size:]
@@ -406,6 +423,7 @@ class MyRawSocket:
                 and src_addr == dest_ip
                 and data_size == 0
             ):
+                print("finito")
                 # finish the connection
                 # data to be sent during finishing the connection
                 fin_packet = ""

@@ -97,6 +97,7 @@ def make_tcp_header(src_port, seq, ackno, fin_flag, syn_flag, rst_flag, psh_flag
         + (TCP_ACK << 4)
         + (TCP_URG << 5)
     )
+
     tcp_header = struct.pack(
         "!HHLLBBHHH",
         TCP_SOURCE,
@@ -325,7 +326,7 @@ def make_ip_header(id, src_ip, dest_ip, data="") -> bytes:
     IP_PROTOCOL = socket.IPPROTO_TCP
     IP_CHECKSUM = 0
     IP_SRC_ADDR = socket.inet_aton(src_ip)
-    IP_DST_ADDR = socket.inet_aton(dest_ip)
+    IP_DST_ADDR = socket.inet_aton(str(dest_ip))
     IP_IHL_VER = (IP_VERSION << 4) + IP_HEADER_LEN
     ip_header = struct.pack(
         "!BBHHHBBH4s4s",
