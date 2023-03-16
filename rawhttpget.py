@@ -42,7 +42,7 @@ def main(url):
 
     raw_socket.download_file(
         source_ip_address, destination_ip_address, source_port, file_pointer
-     )
+    )
     raw_socket.close_sockets()
     sys.exit()
 

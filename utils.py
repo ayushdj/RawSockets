@@ -22,31 +22,20 @@ def calculate_checksum(message):
     Returns:
         checksum: integer checksum value
     """
-    # If the length of the message is odd, pad with a zero byte
-    if len(message) % 2 != 0:
-        message += b"\0"
-    # Calculate the one's complement sum of the message contents
-    checksum = sum(struct.unpack("!{}H".format(len(message) // 2), message))
-    # Fold the 32-bit sum into 16 bits by adding the carry bits
-    checksum = (checksum >> 16) + (checksum & 0xFFFF)
-    checksum += checksum >> 16
-    # Take the one's complement of the result
-    checksum = (~checksum) & 0xFFFF
-    return checksum
-    csum = 0
+    # Initialize checksum to 0
+    checksum = 0
 
-    # loop taking 2 characters at a time
+    # For every 2 bytes, fold together with leftshift of 8 to make 8byte
     for i in range(0, len(message), 2):
-        wr = message[i] + (message[i + 1] << 8)
-        csum = csum + wr
+        fold = message[i] + message[i + 1] << 8
+        checksum += fold
 
-    csum = (csum >> 16) + (csum & 0xFFFF)
-    csum = csum + (csum >> 16)
-
-    # complement and mask to 4 byte short
-    csum = ~csum & 0xFFFF
-
-    return csum
+    # Fold 32 bit sum into 16 bit
+    checksum = (checksum >> 16) + (checksum & 0xFFFF)
+    checksum += checksum << 16
+    # Take one's complement
+    checksum = ~checksum & 0xFFFF
+    return checksum
 
 
 def write_file(file, response_dict: dict):
@@ -72,7 +61,10 @@ def write_file(file, response_dict: dict):
             write_file.writelines(response_dict[element])
         print(f"Done writing file at: {file}")
 
-def make_tcp_header(src_port, seq, ackno, fin_flag, syn_flag, rst_flag, psh_flag, ack_flag):
+
+def make_tcp_header(
+    src_port, seq, ackno, fin_flag, syn_flag, rst_flag, psh_flag, ack_flag
+):
     TCP_SOURCE = src_port
     TCP_DEST = 80
     TCP_SEQ = seq
@@ -111,6 +103,7 @@ def make_tcp_header(src_port, seq, ackno, fin_flag, syn_flag, rst_flag, psh_flag
         TCP_URG_PTR,
     )
     return tcp_header
+
 
 def create_tcp_header_with_checksum(
     tcp_header,
@@ -183,6 +176,7 @@ def create_tcp_header_with_checksum(
         + struct.pack("!H", TCP_URG_PTR)
     )
     return tcp_header
+
 
 # def make_tcp_header(
 #     source_port,

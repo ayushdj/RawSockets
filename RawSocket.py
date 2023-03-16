@@ -70,11 +70,13 @@ class MyRawSocket:
         #     0,
         #     0,
         #     tcp_header=tcp_header,
-        #     source_ip=source_ip, 
+        #     source_ip=source_ip,
         #     dest_ip=dest_ip,
         #     data=b"",
         # )
-        tcp_header = create_tcp_header_with_checksum(tcp_header, source_port, 0, 0, 0, 1, 0, 0, 0, source_ip, dest_ip, "")
+        tcp_header = create_tcp_header_with_checksum(
+            tcp_header, source_port, 0, 0, 0, 1, 0, 0, 0, source_ip, dest_ip, ""
+        )
 
         # final full packet - syn packets dont have any data
         sending_packet = ip_header + tcp_header
@@ -85,7 +87,6 @@ class MyRawSocket:
         # To keep track of packets to be resent
         global start_time
         start_time = time.time()
-        
 
         # # Send the packet
         # self.sending_socket.sendto(ip_header + tcp_header, (dest_ip, 0))
@@ -303,14 +304,7 @@ class MyRawSocket:
         # src_port, seq, ackno, fin_flag, syn_flag, rst_flag, psh_flag,
         # ack_flag):
         tcp_header = make_tcp_header(
-            source_port,
-            tcp_header[3],
-            tcp_header[2] + 1,
-            0,
-            0,
-            0,
-            1,
-            1
+            source_port, tcp_header[3], tcp_header[2] + 1, 0, 0, 0, 1, 1
         )
 
         tcp_header = create_tcp_header_with_checksum(
@@ -325,7 +319,7 @@ class MyRawSocket:
             1,
             source_ip_address,
             destination_ip_address,
-            http_request
+            http_request,
         )
 
         packet = ip_header + tcp_header + http_request.encode()
