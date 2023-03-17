@@ -35,7 +35,9 @@ class MyRawSocket:
 
         self.timer = None
 
-        self.acknowledgement_flags = []
+        self.acknowledgement_flags = [0, 0, 1, 0, 0]
+        self.syn_flags = [0, 0, 0, 0, 1]
+        self.resource_request_flags = [1, 0, 1, 0, 0]
 
     def close_sockets(self):
         """
@@ -98,11 +100,9 @@ class MyRawSocket:
             source_port: source port
             destination_ip_address: destination IP address
         """
-        # set the flags
-        flags = [0,0,0,0,1]
 
         # make IP header and tcp header, and then add them together to be sent as part of 1 singular packet
-        self._send_a_packet_to_server(construct_IPV4_header(42069, source_ip_address, destination_ip_address) + develop_TCP_header(flags, source_port, 0, 0, source_ip_address, destination_ip_address), destination_ip_address=destination_ip_address)
+        self._send_a_packet_to_server(construct_IPV4_header(42069, source_ip_address, destination_ip_address) + develop_TCP_header(self.syn_flags, source_port, 0, 0, source_ip_address, destination_ip_address), destination_ip_address=destination_ip_address)
 
         # start a timer/reset it so that we can actually re-send the syn if we don't get a syn-ack from the server
         self.timer = time.time()
@@ -125,7 +125,8 @@ class MyRawSocket:
         source_ip_address_from_server = socket.inet_ntoa(unpacked_ip_header_from_server[8])
         destination_ip_address_from_server = socket.inet_ntoa(unpacked_ip_header_from_server[9])
         
-        # if we haven't gotten a syn-ack from the server within the time designated, or if we 
+        # if we haven't gotten a syn-ack from the server within the time designated, or if the IP addresses don't match,
+        # then we send another syn to the server.
         if not (
             ((self.timer - time.time()) < 60) and unpacked_tcp_header_from_server[5] == 18 and source_ip_address_from_server == destination_ip_address and
             unpacked_tcp_header_from_server[5] == 18 and destination_ip_address_from_server == source_ip_address and source_port == unpacked_tcp_header_from_server[1]
@@ -146,13 +147,9 @@ class MyRawSocket:
             source_ip_address: source IP address 
             source_port (int): source port
             destination_ip_address: destination IP address
-        """
-
-        # set the flags and construct the packet that needs to be sent as an acknowledgement
-        flags = [0, 0, 1, 0, 0]
-        
+        """        
         # sending the acknowledgement packet
-        self._send_a_packet_to_server(construct_IPV4_header(42070, source_ip_address, destination_ip_address) + develop_TCP_header(flags, source_port, unpacked_tcp_header_from_server[3], unpacked_tcp_header_from_server[2] + 1, source_ip_address, destination_ip_address), destination_ip_address=destination_ip_address)
+        self._send_a_packet_to_server(construct_IPV4_header(42070, source_ip_address, destination_ip_address) + develop_TCP_header(self.acknowledgement_flags, source_port, unpacked_tcp_header_from_server[3], unpacked_tcp_header_from_server[2] + 1, source_ip_address, destination_ip_address), destination_ip_address=destination_ip_address)
 
 
     def my_current_ip_address(self, host):
@@ -178,9 +175,7 @@ class MyRawSocket:
             path: the path of the file
             unpacked_tcp_header_from_server: the unpacked header we got when we did the handshake
         """
-        # set the flags
-        flags = [1, 0, 1, 0, 0]
-
+        
         # create the request string
         http_request = f"GET {path} HTTP/1.0\r\nHOST: {host_name}"
         http_request += CLRF
@@ -189,7 +184,7 @@ class MyRawSocket:
             http_request += " "
 
         # send the request out
-        self._send_a_packet_to_server(construct_IPV4_header(42071, source_ip_address, destination_ip_address) + develop_TCP_header(flags,source_port,unpacked_tcp_header_from_server[3],unpacked_tcp_header_from_server[2] + 1,source_ip_address,destination_ip_address, http_request.encode())  + http_request.encode(), destination_ip_address=destination_ip_address)
+        self._send_a_packet_to_server(construct_IPV4_header(42071, source_ip_address, destination_ip_address) + develop_TCP_header(self.resource_request_flags,source_port,unpacked_tcp_header_from_server[3],unpacked_tcp_header_from_server[2] + 1,source_ip_address,destination_ip_address, http_request.encode())  + http_request.encode(), destination_ip_address=destination_ip_address)
         print("SENT REQUEST")
     
     def _send_a_packet_to_server(self, packet_to_be_sent, destination_ip_address) -> None:
@@ -236,8 +231,7 @@ class MyRawSocket:
                     data_from_server[unpacked_tcp_header_from_server[2]] = packet_from_server[(actual_ip_header_length + actual_tcp_header_length * 4):]
 
                     # create the flags and send another packet to the server asking for more data
-                    flags = [0,0,1,0,0]
-                    self._send_a_packet_to_server(construct_IPV4_header(42070, source_ip_address, destination_ip_address) + develop_TCP_header(flags,source_port,unpacked_tcp_header_from_server[3],unpacked_tcp_header_from_server[2]+ abs((actual_ip_header_length + actual_tcp_header_length * 4) - len(packet_from_server)),source_ip_address,destination_ip_address), destination_ip_address=destination_ip_address)
+                    self._send_a_packet_to_server(construct_IPV4_header(42070, source_ip_address, destination_ip_address) + develop_TCP_header(self.acknowledgement_flags,source_port,unpacked_tcp_header_from_server[3],unpacked_tcp_header_from_server[2]+ abs((actual_ip_header_length + actual_tcp_header_length * 4) - len(packet_from_server)),source_ip_address,destination_ip_address), destination_ip_address=destination_ip_address)
 
                 # if we have gotten all the data, then we save the response
                 elif unpacked_tcp_header_from_server[5] in (17, 25):
