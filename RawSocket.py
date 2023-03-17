@@ -110,9 +110,8 @@ class MyRawSocket:
 
         unpacked_ip_header_from_server, unpacked_tcp_header_from_server, _, _ = self._extract_packet_data_from_server(packet_from_server)
 
-        # extract the IP address for both the destination and the source from the server.
-        source_ip_address_from_server = socket.inet_ntoa(unpacked_ip_header_from_server[8])
-        destination_ip_address_from_server = socket.inet_ntoa(unpacked_ip_header_from_server[9])
+        # get the source and destination IP's from the server
+        source_ip_address_from_server, destination_ip_address_from_server = self._extract_source_and_dest_ip_from_server(unpacked_ip_header_from_server)
         
         # if we haven't gotten a syn-ack from the server within the time designated, or if the IP addresses don't match,
         # then we send another syn to the server.
@@ -239,7 +238,7 @@ class MyRawSocket:
 
         # unpack the IP Header from the server and also get the IP header length
         unpacked_ip_header_from_server = struct.unpack("!BBHHHBBH4s4s", packet_from_server[:20])
-        ip_version_and_header_length, _, _, _, _, _, _, _, source_ip_address_from_server, destination_ip_address_from_server = unpacked_ip_header_from_server
+        ip_version_and_header_length, _, _, _, _, _, _, _, _, _ = unpacked_ip_header_from_server
         actual_ip_header_length = (ip_version_and_header_length & 0xF) * 4
 
         # now unpack the TCP header from the IP header, and also get the length of the TCP header
@@ -249,3 +248,14 @@ class MyRawSocket:
 
         # return all the information
         return unpacked_ip_header_from_server, unpacked_tcp_header_from_server, actual_ip_header_length, actual_tcp_header_length
+    
+    def _extract_source_and_dest_ip_from_server(self, unpacked_ip_header_from_server):
+        """
+        Helper method to determine the source and destination IP address from the server
+
+        Args:
+
+            unpacked_ip_header_from_server: after unpacking the header from the server, we return this information
+        """
+        _, _, _, _, _, _, _, _, source_ip_address_from_server, destination_ip_address_from_server = unpacked_ip_header_from_server
+        return socket.inet_ntoa(source_ip_address_from_server), socket.inet_ntoa(destination_ip_address_from_server)
