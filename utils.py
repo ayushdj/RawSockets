@@ -2,7 +2,6 @@
 
 import socket
 import struct
-import sys
 import urllib.parse
 import random
 
@@ -40,29 +39,27 @@ def calculate_checksum(message):
     # take the one's complement of the checksum and return it
     return ~checksum & 0xFFFF
 
+def save_response_from_server(name_of_file, data_from_server):
+    arr = []
 
-def write_file(file, response_dict: dict):
-    """
-    Write the response from a dictionary to a file.
+    # sort the keys due to the offset nature of receiving data
+    for seq in sorted(data_from_server.keys()):
+        arr.extend(bytearray(data_from_server[seq]))
+    byte_converted_array = bytearray(arr)
 
-    Args:
-        file: file pointer
-        response_dict(dict): dictionary mapping int to strings as parts of response.
-    """
-    response = "".join([response_dict[key] for key in sorted(response_dict)])
-    # Make sure valid HTTP Response Code
-    if response.find("200 OK") < 0:
-        print("[ERROR]: Invalid HTTP Response Code")
-        sys.exit()
-    # Write the response to the file if valid response code.
-    with open(file, "w") as write_file:
-        print(f"opened: {file}")
-        ordered_seq = sorted(response_dict.keys())
-        for idx, element in enumerate(ordered_seq):
-            if idx == 0:
-                write_file.writelines(response_dict[element].split(CLRF)[1])
-            write_file.writelines(response_dict[element])
-        print(f"Done writing file at: {file}")
+    # if we get a 200 response from the first element of the bytearray, then we can
+    # proceed
+    if byte_converted_array.startswith(bytearray("HTTP/1.1 200 OK", "utf-8")):
+        with open(name_of_file, "wb") as new_output_file:
+            new_output_file.write(data_from_server[sorted(data_from_server.keys())[0]].split(CLRF.encode())[1])
+
+            # loop over all the data and write it to the file. We've 
+            # already sorted it.
+            for seq in sorted(data_from_server.keys())[1:]:
+                new_output_file.write(data_from_server[seq])
+            return
+
+
 
 
 def develop_TCP_header(flags,source_port,sequence_number,acknowledgement_number,source_ip_address,destination_ip_address,data=b"") -> bytes:
@@ -71,6 +68,13 @@ def develop_TCP_header(flags,source_port,sequence_number,acknowledgement_number,
     Flags Reference: https://www.site24x7.com/learn/linux/tcp-flags.html
 
     Args:
+        flags: all the TCP flags
+        source_port: the source port
+        sequence_number: the sequence number
+        acknowledgement_number: the ack number
+        source_ip_address: the source IP
+        destination_ip_address: the destination IP 
+        data: the data we want to put into the TCP header
 
     Returns:
         tcp_header as packed bytes
@@ -79,7 +83,7 @@ def develop_TCP_header(flags,source_port,sequence_number,acknowledgement_number,
     flags_tuple = (
         (flags[3] << 2) + (flags[2] << 4) + (flags[4] << 1) + (flags[0] << 3) + (flags[1]) + (0 << 5)
     )
-
+    
     TCP_header = struct.pack("!HHLLBBHHH",source_port,80,sequence_number,acknowledgement_number,(5 << 4),flags_tuple,socket.htons(MAX_WINDOW_SIZE),0,0,)
 
     packet = (struct.pack("!4s4sBBH",socket.inet_aton(source_ip_address),socket.inet_aton(destination_ip_address),0,
@@ -117,11 +121,29 @@ def determine_destination_ip_address(url):
     destnation_ip_address = socket.gethostbyname(host_name)
     return destnation_ip_address
 
+def get_path_url_to_file(split_url) -> str:
+    """
+    Determines the path of the file
 
-def determine_filename_and_path(split_url) -> tuple:
+    Args:
+        split_url: the split url
+    """
+    # if we can get a path, then we do that path other wise we set the
+    # path url to "/"
     path_url = split_url.path or "/"
+    return path_url
+
+def get_name_of_file(split_url) -> str:
+    """
+    Get the name of the file we want
+
+    Args:
+        split_url: the split url
+    """
+    path_url = get_path_url_to_file(split_url)
     file_name = "index.html" if path_url.endswith("/") else split_url.path.rsplit("/", 1)[-1]
-    return file_name, path_url
+    return file_name
+
 
 def generate_random_source_port() -> int:
     """

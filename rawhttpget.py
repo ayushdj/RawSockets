@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 import argparse
 import os
-import random
 import sys
 import urllib.parse
 
 from RawSocket import MyRawSocket
-from utils import determine_destination_ip_address, determine_filename_and_path, generate_random_source_port
+from utils import determine_destination_ip_address, get_path_url_to_file, get_name_of_file, generate_random_source_port
 
 # Monitor tcpdump with: sudo tcpdump -vv -n host 204.44.192.60
 def main(url):
@@ -16,11 +15,13 @@ def main(url):
 
     # extract the source and destination IP addresses, along with
     # creating a random port number
-    source_ip_address = raw_socket.my_current_ip_address()
+    source_ip_address = raw_socket.my_current_ip_address("www.ccs.neu.edu")
     destination_ip_address = determine_destination_ip_address(url)
     source_port = generate_random_source_port()
 
-    file_pointer, path_to_desired_file = determine_filename_and_path(urllib.parse.urlsplit(url))
+    # get the name of the file and the path to that desired file
+    path_to_desired_file = get_path_url_to_file(urllib.parse.urlparse(url))
+    name_of_file = get_name_of_file(urllib.parse.urlparse(url))
     
     # before doing anything, we need to perform the handshake, so we do that here.
     # we also get the unpacked tcp header from the source, so we can pass it along
@@ -29,11 +30,8 @@ def main(url):
 
     # we want to request a particular resource in the destination_ip_address, so we need to 
     # make a GET request.
-    raw_socket.request_for_and_download_file(source_ip_address,source_port,destination_ip_address,url,path_to_desired_file,unpacked_tcp_header_from_server, file_pointer)
+    raw_socket.request_for_and_download_resource(source_ip_address,source_port,destination_ip_address,url,path_to_desired_file,unpacked_tcp_header_from_server, name_of_file)
 
-    # raw_socket.download_file(
-    #     source_ip_address, destination_ip_address, source_port, file_pointer
-    # )
     raw_socket.close_sockets()
     sys.exit()
 
