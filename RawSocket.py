@@ -36,6 +36,9 @@ class MyRawSocket:
         self.timer = None
 
     def close_sockets(self):
+        """
+        Closes both sockets.
+        """
         self.sending_socket.close()
         self.receiving_socket.close()
 
@@ -48,15 +51,38 @@ class MyRawSocket:
         return actual_host
     
     def perform_handshake(self, source_ip_address, source_port, destination_ip_address):
+        """
+        This function conducts the handshake.
+
+        Args:
+            source_ip_address: source IP address
+            source_port: source port
+            destination_ip_address: destination IP address
+        """
 
         # send the syn message
-        self._send_syn(source_ip_address, source_port, destination_ip_address)
+        self._send_syn_to_server(source_ip_address, source_port, destination_ip_address)
 
-        unpacked_tcp_header = self._receive_synack(source_ip_address, source_port, destination_ip_address)
+        # receive the packet from the server and deconstruct it and return the unpacked tcp header
+        return self._receive_synack_from_server(source_ip_address, source_port, destination_ip_address)
 
-        return unpacked_tcp_header
+    def request_for_and_download_file(self, source_ip_address,source_port,destination_ip_address,url,path_to_file,unpacked_tcp_header_from_server, file_pointer):
+        """
+        This function requests for and downloads the file we want.
 
-    def _send_syn(self, source_ip_address, source_port, destination_ip_address) -> None:
+        Args:
+            source_ip_address: source IP address
+            source_port: source port
+            destination_ip_address: destination IP address
+            url: the url of the source
+            path_to_file: the path to the file that we want
+            unpacked_tcp_header_from_server: the unpacked_tcp_header_from_server from the destination
+        """
+
+        # request for the resource in the server
+        self._request_for_resource_in_server(source_ip_address, source_port, destination_ip_address, self.determine_url_host(url), path_to_file, unpacked_tcp_header_from_server)
+
+    def _send_syn_to_server(self, source_ip_address, source_port, destination_ip_address) -> None:
         """
         Create and send syn message.
 
@@ -69,16 +95,20 @@ class MyRawSocket:
         flags = [0,0,0,0,1]
 
         # make IP header and tcp header, and then add them together to be sent as part of 1 singular packet
-        packet_to_be_sent = construct_ip_header(42069, source_ip_address, destination_ip_address) + make_tcp_header(flags, source_port, 0, 0, source_ip_address, destination_ip_address)
+        packet_to_be_sent = construct_IPV4_header(42069, source_ip_address, destination_ip_address) + develop_TCP_header(flags, source_port, 0, 0, source_ip_address, destination_ip_address)
         self.sending_socket.sendto(packet_to_be_sent, (destination_ip_address, 0))
 
         self.timer = time.time()
 
-    def _receive_synack(self, source_ip_address, source_port, destination_ip_address):
+    def _receive_synack_from_server(self, source_ip_address, source_port, destination_ip_address):
         """
         Receive a SYNACK from the server.
+
+        Args:
+            source_ip_address: source IP address 
+            source_port (int): source port
+            destination_ip_address: destination IP address
         """
-        
         # extract the packet from the server and then unpack that packet
         packet_from_server, _ = self.receiving_socket.recvfrom(BUFFER_LENGTH)
         unpacked_ip_header_from_server = struct.unpack("!BBHHHBBH4s4s", packet_from_server[:20])
@@ -108,15 +138,15 @@ class MyRawSocket:
             self._send_acknowledgement(unpacked_tcp_header_from_server, source_ip_address=source_ip_address, source_port=source_port, destination_ip_address=destination_ip_address)
         else:
             print("ENTERED HERE")
-            self._send_syn(source_ip_address, source_port, destination_ip_address)
+            self._send_syn_to_server(source_ip_address, source_port, destination_ip_address)
         return unpacked_tcp_header_from_server
 
-    def _send_acknowledgement(self, unpacked_tcp_header, source_ip_address, source_port, destination_ip_address):
+    def _send_acknowledgement(self, unpacked_tcp_header_from_server, source_ip_address, source_port, destination_ip_address):
         """
         Send ACK message from us.
 
         Args:
-            unpacked_tcp_header: the tcp header we get from the receive_synack function
+            unpacked_tcp_header_from_server: the tcp header we get from the receive_synack function
             source_ip_address: source IP address 
             source_port (int): source port
             destination_ip_address: destination IP address
@@ -124,7 +154,7 @@ class MyRawSocket:
 
         # set the flags and construct the packet that needs to be sent as an acknowledgement
         flags = [0, 0, 1, 0, 0]
-        ack_pack_to_be_sent = construct_ip_header(42070, source_ip_address, destination_ip_address) + make_tcp_header(flags, source_port, unpacked_tcp_header[3], unpacked_tcp_header[2] + 1, source_ip_address, destination_ip_address)
+        ack_pack_to_be_sent = construct_IPV4_header(42070, source_ip_address, destination_ip_address) + develop_TCP_header(flags, source_port, unpacked_tcp_header_from_server[3], unpacked_tcp_header_from_server[2] + 1, source_ip_address, destination_ip_address)
 
         self.sending_socket.sendto(ack_pack_to_be_sent, (destination_ip_address, 0))
 
@@ -141,7 +171,7 @@ class MyRawSocket:
         string_ip = str(ip)
         return string_ip
 
-    def request_for_resource_in_server(self,source_ip_address,source_port,destination_ip_address,host_name,path,unpacked_tcp_header):
+    def _request_for_resource_in_server(self,source_ip_address,source_port,destination_ip_address,host_name,path,unpacked_tcp_header_from_server):
         """
         Send a request to the resource that located in the server
 
@@ -151,7 +181,7 @@ class MyRawSocket:
             destination_ip_address: destination IP address
             host_name: name of the host
             path: the path of the file
-            unpacked_tcp_header: the unpacked header we got when we did the handshake
+            unpacked_tcp_header_from_server: the unpacked header we got when we did the handshake
         """
         # set the flags
         flags = [1, 0, 1, 0, 0]
@@ -164,7 +194,7 @@ class MyRawSocket:
             http_request += " "
 
         # send the data over
-        self.sending_socket.sendto(construct_ip_header(42071, source_ip_address, destination_ip_address) + make_tcp_header(flags,source_port,unpacked_tcp_header[3],unpacked_tcp_header[2] + 1,source_ip_address,destination_ip_address, http_request.encode())  + http_request.encode(), (destination_ip_address, 0))
+        self.sending_socket.sendto(construct_IPV4_header(42071, source_ip_address, destination_ip_address) + develop_TCP_header(flags,source_port,unpacked_tcp_header_from_server[3],unpacked_tcp_header_from_server[2] + 1,source_ip_address,destination_ip_address, http_request.encode())  + http_request.encode(), (destination_ip_address, 0))
         print("SENT REQUEST")
 
     def download_file(self, source_ip, dest_ip, src_port, fp):
@@ -209,7 +239,7 @@ class MyRawSocket:
                 # packet for teardown initiation
                 teardown_initiator = ""
 
-                ip_header = construct_ip_header(54322, source_ip, dest_ip)
+                ip_header = construct_IPV4_header(54322, source_ip, dest_ip)
 
                 # tcp header fields
                 tcp_source = src_port  # source port
@@ -223,7 +253,7 @@ class MyRawSocket:
                 tcp_ack = 1
 
                 data_for_teardown = ""
-                tcp_header = make_tcp_header(
+                tcp_header = develop_TCP_header(
                     tcp_source,
                     tcp_seq,
                     tcp_ack_seq,
@@ -233,7 +263,7 @@ class MyRawSocket:
                     tcp_psh,
                     tcp_ack,
                 )
-                tcp_header = make_tcp_header_with_checksum(
+                tcp_header = develop_TCP_header_with_checksum(
                     tcp_source,
                     tcp_seq,
                     tcp_ack_seq,
@@ -262,7 +292,7 @@ class MyRawSocket:
                 # finish the connection
                 # data to be sent during finishing the connection
                 fin_packet = ""
-                ip_header = construct_ip_header(54322, source_ip, dest_ip)
+                ip_header = construct_IPV4_header(54322, source_ip, dest_ip)
 
                 # tcp header fields
                 tcp_source = src_port  # source port
@@ -278,7 +308,7 @@ class MyRawSocket:
                 # data to be sent in final packet
                 data_in_finpacket = ""
 
-                tcp_header = make_tcp_header(
+                tcp_header = develop_TCP_header(
                     tcp_source,
                     tcp_seq,
                     tcp_ack_seq,
@@ -288,7 +318,7 @@ class MyRawSocket:
                     tcp_psh,
                     tcp_ack,
                 )
-                tcp_header = make_tcp_header_with_checksum(
+                tcp_header = develop_TCP_header_with_checksum(
                     tcp_source,
                     tcp_seq,
                     tcp_ack_seq,
