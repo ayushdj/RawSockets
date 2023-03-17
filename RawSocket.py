@@ -46,8 +46,17 @@ class MyRawSocket:
         splitted_url = urllib.parse.urlsplit(url)
         actual_host = splitted_url.netloc
         return actual_host
+    
+    def perform_handshake(self, source_ip_address, source_port, destination_ip_address):
 
-    def send_syn(self, source_ip_address, source_port, destination_ip_address) -> None:
+        # send the syn message
+        self._send_syn(source_ip_address, source_port, destination_ip_address)
+
+        unpacked_tcp_header = self._receive_synack(source_ip_address, source_port, destination_ip_address)
+
+        return unpacked_tcp_header
+
+    def _send_syn(self, source_ip_address, source_port, destination_ip_address) -> None:
         """
         Create and send syn message.
 
@@ -65,7 +74,7 @@ class MyRawSocket:
 
         self.timer = time.time()
 
-    def receive_synack(self, source_ip_address, source_port, destination_ip_address):
+    def _receive_synack(self, source_ip_address, source_port, destination_ip_address):
         """
         Receive a SYNACK from the server.
         """
@@ -96,13 +105,13 @@ class MyRawSocket:
             and source_port == unpacked_tcp_header_from_server[1]
             and ((self.timer - time.time()) < 60)
         ):
-            self.send_ack(unpacked_tcp_header_from_server, source_ip_address=source_ip_address, source_port=source_port, destination_ip_address=destination_ip_address)
+            self._send_acknowledgement(unpacked_tcp_header_from_server, source_ip_address=source_ip_address, source_port=source_port, destination_ip_address=destination_ip_address)
         else:
             print("ENTERED HERE")
-            self.send_syn(source_ip_address, source_port, destination_ip_address)
+            self._send_syn(source_ip_address, source_port, destination_ip_address)
         return unpacked_tcp_header_from_server
 
-    def send_ack(self, unpacked_tcp_header, source_ip_address, source_port, destination_ip_address):
+    def _send_acknowledgement(self, unpacked_tcp_header, source_ip_address, source_port, destination_ip_address):
         """
         Send ACK message from us.
 
@@ -132,31 +141,31 @@ class MyRawSocket:
         string_ip = str(ip)
         return string_ip
 
-    def request_for_resource_in_server(
-        self,
-        source_ip_address,
-        source_port,
-        destination_ip_address,
-        hostname,
-        path,
-        unpacked_tcp_header,
-    ):
-        ip_header = construct_ip_header(42071, source_ip_address, destination_ip_address)
+    def request_for_resource_in_server(self,source_ip_address,source_port,destination_ip_address,host_name,path,unpacked_tcp_header):
+        """
+        Send a request to the resource that located in the server
 
+        Args:
+            source_ip_address: source IP address 
+            source_port: source port
+            destination_ip_address: destination IP address
+            host_name: name of the host
+            path: the path of the file
+            unpacked_tcp_header: the unpacked header we got when we did the handshake
+        """
+        # set the flags
         flags = [1, 0, 1, 0, 0]
 
-        constructed_tcp_header = make_tcp_header(flags, source_port, unpacked_tcp_header[3], unpacked_tcp_header[2] + 1, source_ip_address, destination_ip_address)
-        print("CONSTRUCTED HEADER in REQUEST FUNCTION")
+        # create the request
+        http_request = f"GET {path} HTTP/1.0\r\nHOST: {host_name}"
+        http_request += CLRF
 
-        # http_request = "".join(
-        #     ["GET ", path, " HTTP/1.1", CLRF, "HOST: ", hostname + CLRF * 2]
-        # )
-        request_httpdata = "GET " + path + " HTTP/1.0\r\nHOST: " + hostname + "\r\n\r\n"
-        if len(request_httpdata) % 2 != 0:
-            request_httpdata += " "
+        if len(http_request) % 2 != 0:
+            http_request += " "
 
-        packet = constructed_tcp_header + ip_header + request_httpdata.encode()
-        self.sending_socket.sendto(packet, (destination_ip_address, 0))
+        # send the data over
+        self.sending_socket.sendto(construct_ip_header(42071, source_ip_address, destination_ip_address) + make_tcp_header(flags,source_port,unpacked_tcp_header[3],unpacked_tcp_header[2] + 1,source_ip_address,destination_ip_address, http_request.encode())  + http_request.encode(), (destination_ip_address, 0))
+        print("SENT REQUEST")
 
     def download_file(self, source_ip, dest_ip, src_port, fp):
         response_dictionary = {}

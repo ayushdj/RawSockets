@@ -18,17 +18,20 @@ def main(url):
     source_ip_address = raw_socket.my_current_ip_address()
     destination_ip_address = determine_destination_ip_address(url)
     source_port = random.randint(1000, 65565)
+    source_port = 3000
     # Monitor tcpdump with: sudo tcpdump -vv -n host 204.44.192.60, can use this too
-    raw_socket.send_syn(source_ip_address, source_port, destination_ip_address)
 
-    #
-    unpacked_tcp_header = raw_socket.receive_synack(
-        source_ip_address, source_port, destination_ip_address
-    )
+    # before doing anything, we need to perform the handshake, so we do that here.
+    # we also get the unpacked tcp header from the source, so we can pass it along
+    # in our subsequent communications 
+    unpacked_tcp_header = raw_socket.perform_handshake(source_ip_address=source_ip_address, source_port=source_port, destination_ip_address=destination_ip_address)
+
 
     file_pointer, path_to_file = determine_filename_and_path(urllib.parse.urlsplit(url))
 
-    # send a request for the resource we want to access
+
+    # we want to request a particular resource in the destination_ip_address, so we need to 
+    # make a GET request.
     raw_socket.request_for_resource_in_server(
         source_ip_address,
         source_port,
@@ -41,7 +44,7 @@ def main(url):
     # raw_socket.download_file(
     #     source_ip_address, destination_ip_address, source_port, file_pointer
     # )
-    # raw_socket.close_sockets()
+    raw_socket.close_sockets()
     sys.exit()
 
 
