@@ -6,16 +6,16 @@ import urllib.parse
 from utils import *
 
 # IP constants
-IP_VERSION = 4
-IP_HEADER_LENGTH = 5
-IP_HEADER_SIZE = IP_HEADER_LENGTH * 4
-IP_TTL = 255
-IP_LENGTH_OFFSET = 20
+# IP_VERSION = 4
+# IP_HEADER_LENGTH = 5
+# IP_HEADER_SIZE = IP_HEADER_LENGTH * 4
+# IP_TTL = 255
+# IP_LENGTH_OFFSET = 20
 
 # TCP constants
-TCP_WINDOW_SIZE = 1024
-TCP_TIMEOUT = 1
-WINDOW_SIZE = 4
+# TCP_WINDOW_SIZE = 1024
+# TCP_TIMEOUT = 1
+# WINDOW_SIZE = 4
 BUFFER_LENGTH = 65565
 
 
@@ -33,290 +33,151 @@ class MyRawSocket:
             socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_TCP
         )
 
+        self.timer = None
+
     def close_sockets(self):
         self.sending_socket.close()
         self.receiving_socket.close()
 
     def determine_url_host(self, url):
         """
-        Helper function to determine the URL of the
+        Helper function to determine the URL of the host
         """
         splitted_url = urllib.parse.urlsplit(url)
         actual_host = splitted_url.netloc
         return actual_host
 
-    def send_syn(self, source_ip, dest_ip, source_port) -> None:
+    def send_syn(self, source_ip_address, source_port, destination_ip_address) -> None:
         """
         Create and send syn message.
 
         Args:
-            source_ip: source IP address
-            dest_ip: destination IP address
+            source_ip_address: source IP address
             source_port: source port
+            destination_ip_address: destination IP address
         """
-        # make IP header
-        ip_header = make_ip_header(54321, source_ip, dest_ip)
+        # set the flags
+        flags = [0,0,0,0,1]
 
-        # Make initial TCP header
-        tcp_header = make_tcp_header(source_port, 0, 0, 0, 1, 0, 0, 0)
-        tcp_header = make_tcp_header_with_checksum(
-            source_port,
-            0,
-            0,
-            0,
-            1,
-            0,
-            0,
-            0,
-            tcp_header=tcp_header,
-            source_ip=source_ip,
-            dest_ip=dest_ip,
-        )
+        # make IP header and tcp header, and then add them together to be sent as part of 1 singular packet
+        packet_to_be_sent = construct_ip_header(42069, source_ip_address, destination_ip_address) + make_tcp_header(flags, source_port, 0, 0, source_ip_address, destination_ip_address)
+        self.sending_socket.sendto(packet_to_be_sent, (destination_ip_address, 0))
 
-        # final full packet - syn packets dont have any data
-        sending_packet = ip_header + tcp_header
+        self.timer = time.time()
 
-        # Send the packet finally - the port specified has no effect
-        self.sending_socket.sendto(sending_packet, (dest_ip, 0))
-
-        # To keep track of packets to be resent
-        global start_time
-        start_time = time.time()
-
-        # # Send the packet
-        # self.sending_socket.sendto(ip_header + tcp_header, (dest_ip, 0))
-        # # Record the time at which SYN is starting
-        # self.syn_start_time = time.time()
-
-    def send_ack(self, src_port, source_ip, dest_ip, tcph):
-        """
-        Send ACK message.
-
-        Args:
-            source_ip: source IP address
-            dest_ip: destination IP address
-            source_port (int): source port
-            tcp_header (bytes): tcp headers
-        """
-        # ip_header = make_ip_header(54322, source_ip, dest_ip)
-        # tcp_sequence_num = tcp_header[3]
-        # tcp_ack_sequence_num = tcp_header[2] + 1  # must increment ack seq number
-
-        # tcp_header = make_tcp_header(
-        #     source_port, tcp_sequence_num, tcp_ack_sequence_num, 0, 0, 0, 0, 1
-        # )
-        # tcp_header = make_tcp_header(
-        #     source_port,
-        #     tcp_sequence_num,
-        #     tcp_ack_sequence_num,
-        #     0,
-        #     0,
-        #     0,
-        #     0,
-        #     1,
-        #     tcp_header=tcp_header,
-        #     source_ip=source_ip,
-        #     dest_ip=dest_ip,
-        #     data=b"",
-        # )
-        # self.sending_socket.sendto(ip_header + tcp_header, (dest_ip, 0))
-        acknowledgement_packet = ""
-        # Incrementing the SYN packetId by 1 and sending it out.
-        ip_header = make_ip_header(54322, source_ip, dest_ip)
-        # tcp header fields
-        tcp_source_port = src_port  # source port
-        tcp_seq = tcph[3]
-        tcp_ack_seq = tcph[2] + 1
-        # tcp flags
-        tcp_fin = 0
-        tcp_syn = 0
-        tcp_rst = 0
-        tcp_psh = 0
-        tcp_ack = 1
-
-        # the ! in the pack format string means network order
-        tcp_header = make_tcp_header(
-            tcp_source_port,
-            tcp_seq,
-            tcp_ack_seq,
-            tcp_fin,
-            tcp_syn,
-            tcp_rst,
-            tcp_psh,
-            tcp_ack,
-        )
-        tcp_header = make_tcp_header_with_checksum(
-            tcp_source_port,
-            tcp_seq,
-            tcp_ack_seq,
-            tcp_fin,
-            tcp_syn,
-            tcp_rst,
-            tcp_psh,
-            tcp_ack,
-            tcp_header=tcp_header,
-            source_ip=source_ip,
-            dest_ip=dest_ip,
-        )
-        acknowledgement_packet = ip_header + tcp_header
-
-        self.sending_socket.sendto(acknowledgement_packet, (dest_ip, 0))
-
-    def receive_synack(self, source_ip, dest_ip, src_port):
+    def receive_synack(self, source_ip_address, source_port, destination_ip_address):
         """
         Receive a SYNACK from the server.
         """
-        # packet = self.receiving_socket.recvfrom(BUFFER_LENGTH)[0]
-        # ip_header_unpack = struct.unpack("!BBHHHBBH4s4s", packet[:20])
-        # header_len = ip_header_unpack[0] & 0xF
-        # address_dest = socket.inet_ntoa(ip_header_unpack[8])
-        # address_source = socket.inet_ntoa(ip_header_unpack[9])
-        # tcp_header = packet[header_len * 4 : header_len * 4 + 20]
-        # tcp_header_unpack = struct.unpack("!HHLLBBHHH", tcp_header)
-        #
-        # if (
-        #     address_source == source_ip
-        #     and address_dest == dest_ip
-        #     and tcp_header_unpack[5] == 18
-        #     and src_port == tcp_header_unpack[1]
-        #     and ((self.syn_start_time - time.time()) < 60)
-        # ):
-        #     print("send_ack called")
-        #     print(tcp_header_unpack)
-        #     self.send_ack(src_port, source_ip, dest_ip, tcp_header_unpack)
-        # else:
-        #     print("send_syn called")
-        #     self.send_syn(source_ip, dest_ip, src_port)
-        # return
+        
+        # extract the packet from the server and then unpack that packet
+        packet_from_server, _ = self.receiving_socket.recvfrom(BUFFER_LENGTH)
+        unpacked_ip_header_from_server = struct.unpack("!BBHHHBBH4s4s", packet_from_server[:20])
 
-        ### OLD IMPLEMENTATION
-        # packet = self.receiving_socket.recvfrom(BUFFER_LENGTH)[0]
-        # ip_header = struct.unpack("!BBHHHBBH4s4s", packet[:20])
-        # version = (ip_header[0] >> 4) & 0xF
-        # ip_header_len = version * 4
-        # source_ip_addr = socket.inet_ntoa(ip_header[8])
-        # dest_ip_addr = socket.inet_ntoa(ip_header[9])
-        # tcp_header = packet[ip_header_len : ip_header_len + 20]
-        # tcp_header = struct.unpack("!HHLLBBHHH", tcp_header)
+        # now extract the tcp header and actually unpack it
+        ip_version_and_header_length, _, _, _, _, _, _, _, source_ip_address_from_server, destination_ip_address_from_server = unpacked_ip_header_from_server
+        actual_ip_header_length = (ip_version_and_header_length & 0xF) * 4
 
-        # print(tcp_header)
+        tcp_header_from_server = packet_from_server[actual_ip_header_length : actual_ip_header_length + 20]
+        unpacked_tcp_header_from_server = struct.unpack("!HHLLBBHHH", tcp_header_from_server)
 
-        # print(f"Source IP: {source_ip_addr} == {dest_ip}")
-        # print(f"Dest IP: {dest_ip_addr} == {source_ip}")
-        # print(f"Header 5: {tcp_header[5]} == 18")
-        # print(f"Source Port: {src_port} == {tcp_header[1]}")
-        # print(f"Time Diff: {self.syn_start_time - time.time()} < 60")
+        # get the source ip and destination ip from the server
+        source_ip_information = unpacked_ip_header_from_server[8]
+        destination_ip_information = unpacked_ip_header_from_server[9]
 
-        # if (
-        #     source_ip_addr == dest_ip
-        #     and dest_ip_addr == source_ip
-        #     and tcp_header[5] == 18
-        #     and src_port == tcp_header[1]
-        #     and self.syn_start_time - time.time() < 60
-        # ):
-        #     self.send_ack(source_ip, dest_ip, src_port, tcp_header)
-        # else:
-        #     self.send_syn(source_ip, dest_ip, src_port)
-        # return tcp_header
-        # starting an infinite loop
-        while True:
-            received_packet = self.receiving_socket.recvfrom(BUFFER_LENGTH)
-            # packet string from tuple
-            received_packet = received_packet[0]
-            # take first 20 characters for the ip header
-            ip_header = received_packet[0:20]
-            # now unpack them
-            iph = struct.unpack("!BBHHHBBH4s4s", ip_header)
-            version_ihl = iph[0]
-            version = version_ihl >> 4
-            ihl = version_ihl & 0xF
-            iph_length = ihl * 4
-            ttl = iph[5]
-            protocol = iph[6]
-            src_addr = socket.inet_ntoa(iph[8])
-            dest_addr = socket.inet_ntoa(iph[9])
-            tcp_header = received_packet[iph_length : iph_length + 20]
+        # extract the IP address for both the destination and the source from the server.
+        source_ip_address_from_server = socket.inet_ntoa(source_ip_information)
+        destination_ip_address_from_server = socket.inet_ntoa(destination_ip_information)
+                
+        if (
+            destination_ip_address_from_server == source_ip_address and
+            source_ip_address_from_server == destination_ip_address
+            and unpacked_tcp_header_from_server[5] == 18
+            and source_port == unpacked_tcp_header_from_server[1]
+            and ((self.timer - time.time()) < 60)
+        ):
+            self.send_ack(unpacked_tcp_header_from_server, source_ip_address=source_ip_address, source_port=source_port, destination_ip_address=destination_ip_address)
+        else:
+            print("ENTERED HERE")
+            self.send_syn(source_ip_address, source_port, destination_ip_address)
+        return unpacked_tcp_header_from_server
 
-            # now unpack them
-            tcph = struct.unpack("!HHLLBBHHH", tcp_header)
+    def send_ack(self, unpacked_tcp_header, source_ip_address, source_port, destination_ip_address):
+        """
+        Send ACK message from us.
 
-            # src_port = tcph[0]
-            dest_port = tcph[1]
-            seq_number = tcph[2]
-            doff_reserved = tcph[4]
-            tcph_length = doff_reserved >> 4
+        Args:
+            unpacked_tcp_header: the tcp header we get from the receive_synack function
+            source_ip_address: source IP address 
+            source_port (int): source port
+            destination_ip_address: destination IP address
+        """
+        # again make the IP header
+        ip_header = construct_ip_header(42070, source_ip_address, destination_ip_address)
 
-            h_size = iph_length + tcph_length * 4
-            data_size = len(received_packet) - h_size
-            # get data from the packet
-            data = received_packet[h_size:]
-            if (
-                src_addr == dest_ip
-                and dest_addr == source_ip
-                and tcph[5] == 18
-                and src_port == tcph[1]
-                and ((start_time - time.time()) < 60)
-            ):
-                self.send_ack(src_port, source_ip, dest_ip, tcph)
-                break
-            else:
-                self.send_syn(source_ip, dest_ip, src_port)
-                break
-        return tcph
+        # set the flags and construct the packet that needs to be sent as an acknowledgement
+        flags = [0, 0, 1, 0, 0]
+        ack_pack_to_be_sent = construct_ip_header(42070, source_ip_address, destination_ip_address) + make_tcp_header(flags, source_port, unpacked_tcp_header[3], unpacked_tcp_header[2] + 1, source_ip_address, source_ip_address)
 
-    def determine_local_host_ip_address(self):
+        self.sending_socket.sendto(ack_pack_to_be_sent, (destination_ip_address, 0))
+
+
+    def my_current_ip_address(self):
+        """
+            Helper method to determine the IP address of the source (i.e. us)
+        """
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            sock.connect(("www.ccs.neu.edu", 80))
-            ip = sock.getsockname()[0]
-        except socket.error:
-            ip = "ERR"
-        sock.close()
-        return str(ip)
+        port_number = 80
+        sock.connect(("www.ccs.neu.edu", port_number))
+        sock_name = sock.getsockname()
+        ip = sock_name[0]
+        string_ip = str(ip)
+        return string_ip
 
-    def request_for_resource(
+    def request_for_resource_in_server(
         self,
         source_ip_address,
-        destination_ip_address,
         source_port,
-        tcp_header,
+        destination_ip_address,
         hostname,
         path,
+        unpacked_tcp_header,
     ):
-        ip_header = make_ip_header(54323, source_ip_address, destination_ip_address)
-        tcp_header = make_tcp_header(
-            source_port, tcp_header[3], tcp_header[2] + 1, 0, 0, 0, 1, 1
-        )
+        ip_header = construct_ip_header(42671, source_ip_address, destination_ip_address)
+
+        flags = [1, 0, 1, 0, 0]
+
+        constructed_tcp_header = make_tcp_header(flags, source_port, unpacked_tcp_header[3], unpacked_tcp_header[2] + 1, source_ip_address, source_ip_address)
+        print("CONSTRUCTED HEADER in REQUEST FUNCTION")
 
         http_request = "".join(
             ["GET ", path, " HTTP/1.1", CLRF, "HOST: ", hostname + CLRF * 2]
         )
-
         if len(http_request) % 2 != 0:
             http_request += " "
 
-        # src_port, seq, ackno, fin_flag, syn_flag, rst_flag, psh_flag,
-        # ack_flag):
-        tcp_header = make_tcp_header(
-            source_port, tcp_header[3], tcp_header[2] + 1, 0, 0, 0, 1, 1
-        )
+        # # src_port, seq, ackno, fin_flag, syn_flag, rst_flag, psh_flag,
+        # # ack_flag):
+        # tcp_header = make_tcp_header(
+        #     source_port, tcp_header[3], tcp_header[2] + 1, 0, 0, 0, 1, 1
+        # )
 
-        tcp_header = make_tcp_header_with_checksum(
-            source_port,
-            tcp_header[3],
-            tcp_header[2] + 1,
-            0,
-            0,
-            0,
-            1,
-            1,
-            tcp_header=tcp_header,
-            source_ip=source_ip_address,
-            dest_ip=destination_ip_address,
-            data=http_request.encode(),
-        )
+        # tcp_header = make_tcp_header_with_checksum(
+        #     source_port,
+        #     tcp_header[3],
+        #     tcp_header[2] + 1,
+        #     0,
+        #     0,
+        #     0,
+        #     1,
+        #     1,
+        #     tcp_header=tcp_header,
+        #     source_ip=source_ip_address,
+        #     dest_ip=destination_ip_address,
+        #     data=http_request.encode(),
+        # )
 
-        packet = ip_header + tcp_header + http_request.encode()
+        packet = constructed_tcp_header + ip_header + http_request.encode()
         self.sending_socket.sendto(packet, (destination_ip_address, 0))
 
     def download_file(self, source_ip, dest_ip, src_port, fp):
@@ -361,7 +222,7 @@ class MyRawSocket:
                 # packet for teardown initiation
                 teardown_initiator = ""
 
-                ip_header = make_ip_header(54322, source_ip, dest_ip)
+                ip_header = construct_ip_header(54322, source_ip, dest_ip)
 
                 # tcp header fields
                 tcp_source = src_port  # source port
@@ -414,7 +275,7 @@ class MyRawSocket:
                 # finish the connection
                 # data to be sent during finishing the connection
                 fin_packet = ""
-                ip_header = make_ip_header(54322, source_ip, dest_ip)
+                ip_header = construct_ip_header(54322, source_ip, dest_ip)
 
                 # tcp header fields
                 tcp_source = src_port  # source port

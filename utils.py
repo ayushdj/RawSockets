@@ -6,12 +6,12 @@ import sys
 import urllib.parse
 
 CLRF = "\r\n\r\n"
-IP_HEADER_LENGTH = 5
-IP_LENGTH_OFFSET = 20
-IP_VERSION = 4
-TCP_PROTOCOL = socket.IPPROTO_TCP
-TCP_DEST_PORT = 80
-TCP_DATA_OFFSET = 5
+# IP_HEADER_LENGTH = 5
+# IP_LENGTH_OFFSET = 20
+# IP_VERSION = 4
+# TCP_PROTOCOL = socket.IPPROTO_TCP
+# TCP_DEST_PORT = 80
+# TCP_DATA_OFFSET = 5
 MAX_WINDOW_SIZE = 5840
 
 def calculate_checksum(message):
@@ -33,16 +33,15 @@ def calculate_checksum(message):
     # iterate over every 16-bit chunk of the message
     for i in range(0, len(message), 2):
         # combine the two bytes into a 16-bit integer
-        word = message[i] + (message[i+1] << 8)
+        left_shift = message[i+1] << 8
+        word = message[i] + left_shift
         # add the 16-bit integer to the checksum
         checksum += word
         # wrap the checksum if it overflows
         checksum = (checksum & 0xFFFF) + (checksum >> 16)
 
-    # take the one's complement of the checksum
-    checksum = ~checksum & 0xFFFF
-
-    return checksum
+    # take the one's complement of the checksum and return it
+    return ~checksum & 0xFFFF
 
 
 def write_file(file, response_dict: dict):
@@ -70,14 +69,13 @@ def write_file(file, response_dict: dict):
 
 
 def make_tcp_header(
-    src_port,
-    sequence_num,
-    ack_num,
-    finish_flag,
-    syn_flag,
-    reset_flag,
-    push_flag,
-    ack_flag,
+    flags,
+    source_port,
+    sequence_number,
+    acknowledgement_number,
+    source_ip_address,
+    destination_ip_address,
+    data=b""
 ) -> bytes:
     """
     Make a TCP header and return the packed bytes.
@@ -88,128 +86,123 @@ def make_tcp_header(
     Returns:
         tcp_header as packed bytes
     """
-    tcp_urg_ptr = 0
-    window = socket.htons(MAX_WINDOW_SIZE)
-    checksum = 0
-    tcp_offset = (TCP_DATA_OFFSET << 4) + 0
-    # Pack all the flags into one using shift
-    flags = (
-        finish_flag
-        + (syn_flag << 1)
-        + (reset_flag << 2)
-        + (push_flag << 3)
-        + (ack_flag << 4)
-        + (tcp_urg_ptr << 5)
-    )
-    return struct.pack(
-        "!HHLLBBHHH",
-        src_port,
-        TCP_DEST_PORT,
-        sequence_num,
-        ack_num,
-        tcp_offset,
-        flags,
-        window,
-        checksum,
-        tcp_urg_ptr,
+    # create the tuple of flags from the arguments
+    flags_tuple = (
+        (flags[3] << 2) + (flags[2] << 4) + (flags[4] << 1) + (flags[0] << 3) + (flags[1]) + (0 << 5)
     )
 
-
-def make_tcp_header_with_checksum(
-    src_port,
-    sequence_num,
-    ack_num,
-    finish_flag,
-    syn_flag,
-    reset_flag,
-    push_flag,
-    ack_flag,
-    tcp_header=None,
-    source_ip=None,
-    dest_ip=None,
-    data=b"",
-) -> bytes:
-    """
-    Make a TCP header also including the checksum for the passed in the TCP header.
-    Flags Reference: https://www.site24x7.com/learn/linux/tcp-flags.html
-
-    Args:
-        src_port (int): port of source
-        sequence_num (int): number in sequence
-        ack_num (int): acknowledgement number
-        finish_flag (int): determines if finished
-        reset_flag (int): determines whether to drop connection and reset
-        push_flag (int): determines if this header is pushing data
-        ack_flag (int): determines acknowledgement
-        tcp_header (bytes): passed in tcp_header to calculate the checksum for (optional)
-        source_ip: IP address of source (optional)
-        dest_ip: IP address of destination (optional)
-        data (bytes): data to be included in the request (optional)
-
-    Returns:
-        tcp_header as packed bytes including the checksum
-    """
-    # Verify args have been passed in properly
-    if not tcp_header or not source_ip or not dest_ip:
-        print(
-            f"[ERROR]: missing parameters for tcp_header | source_ip | dest_ip. Found {tcp_header}, {source_ip}, and {dest_ip}"
-        )
-        sys.exit()
-
-    tcp_urg_ptr = 0
-    window = socket.htons(MAX_WINDOW_SIZE)
-    checksum = 0
-    tcp_offset = (TCP_DATA_OFFSET << 4) + 0
-    # Pack all the flags into one using shift
-    flags = (
-        finish_flag
-        + (syn_flag << 1)
-        + (reset_flag << 2)
-        + (push_flag << 3)
-        + (ack_flag << 4)
-        + (tcp_urg_ptr << 5)
+    tcp_header = struct.pack("!HHLLBBHHH",source_port,80,sequence_number,acknowledgement_number,(5 << 4),flags_tuple,socket.htons(MAX_WINDOW_SIZE),0,0,
     )
 
-    # Extract the source/dest IP addresses as bytes
-    source_address = socket.inet_aton(source_ip)
-    dest_address = socket.inet_aton(dest_ip)
-
-    # Create the packet
-    packet = (
-        struct.pack(
-            "!4s4sBBH",
-            source_address,
-            dest_address,
-            0,
-            TCP_PROTOCOL,
-            len(tcp_header) + len(data),
-        )
-        + tcp_header
-        + data
+    packet = (struct.pack("!4s4sBBH",socket.inet_aton(source_ip_address),socket.inet_aton(destination_ip_address),0,
+                socket.IPPROTO_TCP,
+                len(tcp_header) + len(data),
+            ) + tcp_header + data
     )
 
-    # Return the tcp_header packed
-    return (
-        struct.pack(
-            "!HHLLBBH",
-            src_port,
-            TCP_DEST_PORT,
-            sequence_num,
-            ack_num,
-            tcp_offset,
-            flags,
-            window,
-        )
-        + struct.pack("H", calculate_checksum(packet))
-        + struct.pack("!H", tcp_urg_ptr)
+    # return the packet with the checksum calculated for that packet
+    return (struct.pack("!HHLLBBH",source_port,80,sequence_number,acknowledgement_number,(5 << 4),flags_tuple,socket.htons(MAX_WINDOW_SIZE),) 
+            + struct.pack("H", calculate_checksum(packet)) + struct.pack("!H", 0)
     )
 
+# def make_tcp_header_with_checksum(
+#     src_port,
+#     sequence_num,
+#     ack_num,
+#     finish_flag,
+#     syn_flag,
+#     reset_flag,
+#     push_flag,
+#     ack_flag,
+#     tcp_header=None,
+#     source_ip=None,
+#     dest_ip=None,
+#     data=b"",
+# ) -> bytes:
+#     """
+#     Make a TCP header also including the checksum for the passed in the TCP header.
+#     Flags Reference: https://www.site24x7.com/learn/linux/tcp-flags.html
 
-def make_ip_header(id, src_ip, dest_ip, data=b"") -> bytes:
+#     Args:
+#         src_port (int): port of source
+#         sequence_num (int): number in sequence
+#         ack_num (int): acknowledgement number
+#         finish_flag (int): determines if finished
+#         reset_flag (int): determines whether to drop connection and reset
+#         push_flag (int): determines if this header is pushing data
+#         ack_flag (int): determines acknowledgement
+#         tcp_header (bytes): passed in tcp_header to calculate the checksum for (optional)
+#         source_ip: IP address of source (optional)
+#         dest_ip: IP address of destination (optional)
+#         data (bytes): data to be included in the request (optional)
+
+#     Returns:
+#         tcp_header as packed bytes including the checksum
+#     """
+#     # Verify args have been passed in properly
+#     if not tcp_header or not source_ip or not dest_ip:
+#         print(
+#             f"[ERROR]: missing parameters for tcp_header | source_ip | dest_ip. Found {tcp_header}, {source_ip}, and {dest_ip}"
+#         )
+#         sys.exit()
+
+#     tcp_urg_ptr = 0
+#     window = socket.htons(MAX_WINDOW_SIZE)
+#     checksum = 0
+#     tcp_offset = (TCP_DATA_OFFSET << 4) + 0
+#     # Pack all the flags into one using shift
+#     flags = (
+#         finish_flag
+#         + (syn_flag << 1)
+#         + (reset_flag << 2)
+#         + (push_flag << 3)
+#         + (ack_flag << 4)
+#         + (tcp_urg_ptr << 5)
+#     )
+
+#     # Extract the source/dest IP addresses as bytes
+#     source_address = socket.inet_aton(source_ip)
+#     dest_address = socket.inet_aton(dest_ip)
+
+#     # Create the packet
+#     packet = (
+#         struct.pack(
+#             "!4s4sBBH",
+#             source_address,
+#             dest_address,
+#             0,
+#             TCP_PROTOCOL,
+#             len(tcp_header) + len(data),
+#         )
+#         + tcp_header
+#         + data
+#     )
+
+#     # Return the tcp_header packed
+#     return (
+#         struct.pack(
+#             "!HHLLBBH",
+#             src_port,
+#             TCP_DEST_PORT,
+#             sequence_num,
+#             ack_num,
+#             tcp_offset,
+#             flags,
+#             window,
+#         )
+#         + struct.pack("H", calculate_checksum(packet))
+#         + struct.pack("!H", 0)
+#     )
+
+
+
+
+def construct_ip_header(id, src_ip, dest_ip, data=b"") -> bytes:
     """
     Generate IP header.
 
     Args:
+        id: the identifier of the packet
         src_ip: source IP address
         dest_ip: destination IP address
         protocol: network protocol to use
@@ -217,20 +210,8 @@ def make_ip_header(id, src_ip, dest_ip, data=b"") -> bytes:
     Returns
         IP header packed
     """
-    return struct.pack(
-        "!BBHHHBBH4s4s",
-        (IP_VERSION << 4) + IP_HEADER_LENGTH,
-        0,                                      # type of service
-        len(data) + IP_LENGTH_OFFSET,           # size
-        id,                                     # packet id
-        0,                                      # fragmentation offset
-        255,                                    # Time to live
-        TCP_PROTOCOL,
-        0,                                      # checksum
-        socket.inet_aton(src_ip),               # source IP as bytes
-        socket.inet_aton(dest_ip),              # destination IP as bytes
-    )
-
+    return struct.pack("!BBHHHBBH4s4s", (4 << 4) + 5, 0,len(data) + 20,id,0,255,socket.IPPROTO_TCP,0,socket.inet_aton(src_ip),socket.inet_aton(dest_ip))
+    
 
 def determine_destination_ip_address(url):
     returned_tuple = urllib.parse.urlparse(url)
@@ -239,22 +220,7 @@ def determine_destination_ip_address(url):
     return destnation_ip_address
 
 
-def get_filename(url) -> tuple:
-    """
-    Extract the filename and path given a URL.
-
-    Args:
-        url: url from urllib.parse.
-    Returns:
-        tuple: filename and the path of the url.
-    """
-    # Set defaults
-    file_path = "/"
-    file_name = "index.html"
-
-    if url.path != "/":
-        file_path = url.path
-        if url.path[-1] != "/":
-            file_name = url.path.rsplit("/", 1)[1]
-
-    return file_name, file_path
+def determine_filename_and_path(split_url) -> tuple:
+    path_url = split_url.path or "/"
+    file_name = "index.html" if path_url.endswith("/") else split_url.path.rsplit("/", 1)[-1]
+    return file_name, path_url
