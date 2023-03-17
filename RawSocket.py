@@ -112,12 +112,10 @@ class MyRawSocket:
             source_port (int): source port
             destination_ip_address: destination IP address
         """
-        # again make the IP header
-        ip_header = construct_ip_header(42070, source_ip_address, destination_ip_address)
 
         # set the flags and construct the packet that needs to be sent as an acknowledgement
         flags = [0, 0, 1, 0, 0]
-        ack_pack_to_be_sent = construct_ip_header(42070, source_ip_address, destination_ip_address) + make_tcp_header(flags, source_port, unpacked_tcp_header[3], unpacked_tcp_header[2] + 1, source_ip_address, source_ip_address)
+        ack_pack_to_be_sent = construct_ip_header(42070, source_ip_address, destination_ip_address) + make_tcp_header(flags, source_port, unpacked_tcp_header[3], unpacked_tcp_header[2] + 1, source_ip_address, destination_ip_address)
 
         self.sending_socket.sendto(ack_pack_to_be_sent, (destination_ip_address, 0))
 
@@ -143,41 +141,21 @@ class MyRawSocket:
         path,
         unpacked_tcp_header,
     ):
-        ip_header = construct_ip_header(42671, source_ip_address, destination_ip_address)
+        ip_header = construct_ip_header(42071, source_ip_address, destination_ip_address)
 
         flags = [1, 0, 1, 0, 0]
 
-        constructed_tcp_header = make_tcp_header(flags, source_port, unpacked_tcp_header[3], unpacked_tcp_header[2] + 1, source_ip_address, source_ip_address)
+        constructed_tcp_header = make_tcp_header(flags, source_port, unpacked_tcp_header[3], unpacked_tcp_header[2] + 1, source_ip_address, destination_ip_address)
         print("CONSTRUCTED HEADER in REQUEST FUNCTION")
 
-        http_request = "".join(
-            ["GET ", path, " HTTP/1.1", CLRF, "HOST: ", hostname + CLRF * 2]
-        )
-        if len(http_request) % 2 != 0:
-            http_request += " "
-
-        # # src_port, seq, ackno, fin_flag, syn_flag, rst_flag, psh_flag,
-        # # ack_flag):
-        # tcp_header = make_tcp_header(
-        #     source_port, tcp_header[3], tcp_header[2] + 1, 0, 0, 0, 1, 1
+        # http_request = "".join(
+        #     ["GET ", path, " HTTP/1.1", CLRF, "HOST: ", hostname + CLRF * 2]
         # )
+        request_httpdata = "GET " + path + " HTTP/1.0\r\nHOST: " + hostname + "\r\n\r\n"
+        if len(request_httpdata) % 2 != 0:
+            request_httpdata += " "
 
-        # tcp_header = make_tcp_header_with_checksum(
-        #     source_port,
-        #     tcp_header[3],
-        #     tcp_header[2] + 1,
-        #     0,
-        #     0,
-        #     0,
-        #     1,
-        #     1,
-        #     tcp_header=tcp_header,
-        #     source_ip=source_ip_address,
-        #     dest_ip=destination_ip_address,
-        #     data=http_request.encode(),
-        # )
-
-        packet = constructed_tcp_header + ip_header + http_request.encode()
+        packet = constructed_tcp_header + ip_header + request_httpdata.encode()
         self.sending_socket.sendto(packet, (destination_ip_address, 0))
 
     def download_file(self, source_ip, dest_ip, src_port, fp):
