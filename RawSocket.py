@@ -5,17 +5,6 @@ import urllib.parse
 
 from utils import *
 
-# IP constants
-# IP_VERSION = 4
-# IP_HEADER_LENGTH = 5
-# IP_HEADER_SIZE = IP_HEADER_LENGTH * 4
-# IP_TTL = 255
-# IP_LENGTH_OFFSET = 20
-
-# TCP constants
-# TCP_WINDOW_SIZE = 1024
-# TCP_TIMEOUT = 1
-# WINDOW_SIZE = 4
 BUFFER_LENGTH = 65565
 
 
